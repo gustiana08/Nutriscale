@@ -29,7 +29,7 @@ import altair as alt
 # Inisialisasi Database
 init_db()
 
-st.set_page_config(page_title="GiziKu — Perencanaan & Pencatatan Gizi SPPG", page_icon="🥗", layout="wide")
+st.set_page_config(page_title="GiziKu — Perencanaan & Pencatatan Gizi SPPG", page_icon="🥗", layout="wide", initial_sidebar_state="expanded")
 
 # =========================================================
 # TEMA VISUAL — style.css + .streamlit/config.toml
@@ -45,36 +45,74 @@ if os.path.exists(_CSS_PATH):
 # Seluruh tema visual tinggal di style.css dan .streamlit/config.toml
 
 # ---------------------------------------------------------
-# HEADER BANNER APLIKASI
+# SIDEBAR — identitas, navigasi halaman, ringkasan hari ini
 # ---------------------------------------------------------
-st.markdown("""
-<div class="app-header">
-    <div class="app-header-mark">
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M5 19C5 10.5 11.5 4.5 20 4.5c0 8.5-6 14.5-15 14.5Z"/>
-            <path d="M5 19c3-5.5 7-9.5 12-12"/>
-        </svg>
+_HARI_ID = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+_BULAN_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
+             "Agustus", "September", "Oktober", "November", "Desember"]
+
+def _fmt_angka(x):
+    """Format angka gaya Indonesia: 1.166,5."""
+    s = f"{float(x):,.1f}"
+    return s.replace(",", " ").replace(".", ",").replace(" ", ".")
+
+def _fmt_tanggal_id(tgl):
+    return f"{_HARI_ID[tgl.weekday()]}, {tgl.day} {_BULAN_ID[tgl.month - 1]} {tgl.year}"
+
+with st.sidebar:
+    st.markdown("""
+    <div class="side-brand">
+        <div class="side-brand-mark">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 19C5 10.5 11.5 4.5 20 4.5c0 8.5-6 14.5-15 14.5Z"/>
+                <path d="M5 19c3-5.5 7-9.5 12-12"/>
+            </svg>
+        </div>
+        <div>
+            <div class="side-brand-name">GiziKu</div>
+            <div class="side-brand-sub">SPPG &middot; Dapur Pusat</div>
+        </div>
     </div>
-    <div>
-        <h1>GiziKu</h1>
-        <p>Perencanaan menu, pencatatan sajian harian, dan pengelolaan bahan pangan untuk Satuan Pelayanan Pemenuhan Gizi (SPPG).</p>
-    </div>
+    """, unsafe_allow_html=True)
+    st.markdown('<div class="side-label">Menu</div>', unsafe_allow_html=True)
+    halaman = st.radio(
+        "Navigasi halaman",
+        ["Input Menu Harian", "Laporan & Rekapitulasi Gizi", "Database & Kelola Bahan"],
+        key="nav_halaman",
+        label_visibility="collapsed",
+    )
+    # Kartu ringkasan hari ini — data asli dari log menu tersimpan.
+    _hari_ini = tanggal_hari_ini()
+    _df_ini = ambil_laporan_harian(_hari_ini.strftime("%Y-%m-%d"), _hari_ini.strftime("%Y-%m-%d"))
+    if not _df_ini.empty:
+        _energi_ini = _fmt_angka(_df_ini["energi_kcal"].sum())
+        _menu_ini = int(_df_ini["nama_menu"].nunique())
+        _isi_ini = (f'<div class="side-today-val">{_energi_ini} <span>kkal</span></div>'
+                    f'<div class="side-today-sub">{_menu_ini} menu tercatat</div>')
+    else:
+        _isi_ini = '<div class="side-today-sub">Belum ada menu tercatat hari ini.</div>'
+    st.markdown('<div class="side-label">Hari Ini</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="side-today"><div class="side-today-lab">Energi tersaji &middot; {_fmt_tanggal_id(_hari_ini)}</div>{_isi_ini}</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="side-note">Perencanaan menu, pencatatan sajian harian, dan pengelolaan bahan pangan untuk Satuan Pelayanan Pemenuhan Gizi (SPPG).</div>',
+        unsafe_allow_html=True,
+    )
+
+# Kepala halaman utama: judul halaman aktif + tanggal hari ini (WIB).
+st.markdown(f"""
+<div class="page-head">
+    <h1>{halaman}</h1>
+    <span>{_fmt_tanggal_id(tanggal_hari_ini())}</span>
 </div>
 """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------
-# TIGA TAB UTAMA APLIKASI
-# ---------------------------------------------------------
-tab1, tab2, tab3 = st.tabs([
-    "Input Menu Harian", 
-    "Laporan & Rekapitulasi Gizi", 
-    "Database & Kelola Bahan"
-])
-
 # =========================================================
-# TAB 1: INPUT MENU HARIAN
+# HALAMAN 1: INPUT MENU HARIAN
 # =========================================================
-with tab1:
+if halaman == "Input Menu Harian":
     st.subheader("Pencatatan Menu Sajian Harian")
 
     if 'flash_tab1' in st.session_state:
@@ -260,7 +298,7 @@ with tab1:
 # =========================================================
 # TAB 2: LAPORAN & REKAPITULASI
 # =========================================================
-with tab2:
+elif halaman == "Laporan & Rekapitulasi Gizi":
     st.subheader("Filter Laporan Gizi Harian SPPG")
     
     col_f1, col_f2 = st.columns(2)
@@ -318,7 +356,7 @@ with tab2:
         data_grafik["tanggal"] = pd.to_datetime(data_grafik["tanggal"])
         grafik = (
             alt.Chart(data_grafik)
-            .mark_line(point=True, color="#e8a33d")
+            .mark_line(point=True, color="#1c4fa0")
             .encode(
                 x=alt.X("tanggal:T", title="Tanggal"),
                 y=alt.Y("energi_kcal:Q", title="Energi (kcal)", scale=alt.Scale(zero=True, nice=True)),
@@ -392,7 +430,7 @@ with tab2:
 # =========================================================
 # TAB 3: DATABASE & KELOLA BAHAN PANGAN
 # =========================================================
-with tab3:
+elif halaman == "Database & Kelola Bahan":
     st.subheader("Database Bahan Pangan")
 
     if 'flash_tab3' in st.session_state:

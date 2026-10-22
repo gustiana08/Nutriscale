@@ -1,24 +1,27 @@
 /* ============================================================
-   GiziKu — tema visual
-   Palet: hijau daun solid di atas kertas hangat, satu aksen
-   amber (logo mark + grafik). Tanpa gradasi, tanpa glow.
+   GiziKu — tema visual "Biru Institusi" (layout sidebar terang)
+   Palet: biru institusi solid di atas kertas dingin, sidebar
+   terang, satu aksen amber (angka energi + logo). Tanpa
+   gradasi, tanpa glow.
    Font: Plus Jakarta Sans — typeface Indonesia, ramah dan
    terbaca jelas untuk staf SPPG.
    ============================================================ */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-    --green-900: #0c3b24;
-    --green-700: #14663c;
-    --green-600: #1a7a46;
-    --sage-100: #e9f0ea;
-    --sage-200: #d8e4da;
-    --paper: #f7f6f1;
+    --navy-900: #0a2a5e;
+    --blue-700: #1c4fa0;
+    --blue-600: #2a63bd;
+    --paper: #f4f6fa;
     --surface: #ffffff;
-    --ink: #1d2521;
-    --muted: #5f6e63;
-    --line: #d9ded6;
+    --sidebar: #fcfdff;
+    --tint: #e6ecf6;
+    --tint-2: #dbe6f5;
+    --ink: #16283f;
+    --muted: #5a6c87;
+    --line: #dbe2ef;
     --amber: #e8a33d;
+    --amber-dark: #b97a06;
 }
 
 .stApp {
@@ -31,44 +34,148 @@ header[data-testid="stHeader"] {
     background-color: transparent;
 }
 
-/* ---------- Header aplikasi ---------- */
-.app-header {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    background-color: var(--green-900);
-    padding: 26px 30px;
+/* ---------- Konten utama sebagai satu kartu besar ---------- */
+[data-testid="stMain"] [data-testid="stMainBlockContainer"] {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
     border-radius: 16px;
+    padding: 30px 34px 26px;
+    margin-top: 22px;
     margin-bottom: 26px;
 }
-.app-header-mark {
+
+/* ---------- Sidebar ---------- */
+section[data-testid="stSidebar"] {
+    background-color: var(--sidebar);
+    border-right: 1px solid var(--line);
+}
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+    padding-top: 18px;
+}
+.side-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 22px;
+}
+.side-brand-mark {
     flex: 0 0 auto;
-    width: 54px;
-    height: 54px;
-    border-radius: 14px;
-    background-color: var(--amber);
+    width: 44px;
+    height: 44px;
+    border-radius: 11px;
+    background-color: var(--navy-900);
     display: flex;
     align-items: center;
     justify-content: center;
 }
-.app-header h1 {
-    color: #ffffff;
-    font-size: 30px;
+.side-brand-name {
+    font-size: 19px;
     font-weight: 800;
-    letter-spacing: -0.5px;
-    margin: 0 0 4px 0;
+    color: var(--navy-900);
+    line-height: 1.15;
+}
+.side-brand-sub {
+    font-size: 12px;
+    color: var(--muted);
+}
+.side-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #93a5c0;
+    margin: 18px 0 8px;
+}
+.side-today {
+    background-color: var(--tint);
+    border-radius: 12px;
+    padding: 13px 14px;
+}
+.side-today-lab {
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-bottom: 3px;
+}
+.side-today-val {
+    font-size: 21px;
+    font-weight: 800;
+    color: var(--navy-900);
+}
+.side-today-val span {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--amber-dark);
+}
+.side-today-sub {
+    font-size: 12px;
+    color: var(--muted);
+}
+.side-note {
+    margin-top: 20px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--muted);
+}
+
+/* Navigasi sidebar: radio tampil sebagai daftar menu */
+section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] {
+    gap: 4px;
+}
+section[data-testid="stSidebar"] [data-testid="stRadio"] label {
+    width: 100%;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin: 0;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
+    background-color: var(--tint);
+}
+section[data-testid="stSidebar"] [data-testid="stRadioOption"] > div > div:first-of-type {
+    display: none;
+}
+section[data-testid="stSidebar"] [data-testid="stRadio"] label p {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+}
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked),
+section[data-testid="stSidebar"] [data-testid="stRadioOption"][data-selected="true"] {
+    background-color: var(--blue-700);
+}
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) p,
+section[data-testid="stSidebar"] [data-testid="stRadioOption"][data-selected="true"] p {
+    color: #ffffff;
+}
+
+/* ---------- Kepala halaman ---------- */
+.page-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 2px solid var(--tint);
+    padding-bottom: 14px;
+    margin-bottom: 20px;
+}
+.page-head h1 {
+    font-size: 25px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    color: var(--navy-900);
+    margin: 0;
     padding: 0;
 }
-.app-header p {
-    color: #b9d2c0;
-    font-size: 15px;
-    line-height: 1.5;
-    margin: 0;
+.page-head span {
+    font-size: 13.5px;
+    color: var(--muted);
+    white-space: nowrap;
 }
 
 /* ---------- Judul seksi ---------- */
 .stApp h2 {
-    color: var(--green-900);
+    color: var(--navy-900);
     font-weight: 700;
     letter-spacing: -0.3px;
 }
@@ -80,27 +187,27 @@ header[data-testid="stHeader"] {
     color: var(--muted);
 }
 
-/* ---------- Tab utama ---------- */
+/* ---------- Sub-tab (di dalam halaman Database) ---------- */
 .stTabs [data-baseweb="tab-list"] {
     gap: 6px;
-    background-color: var(--sage-100);
+    background-color: var(--tint);
     padding: 6px;
     border-radius: 14px;
-    border: 1px solid var(--sage-200);
+    border: 1px solid var(--tint-2);
 }
 .stTabs [data-baseweb="tab"] {
     border-radius: 10px;
     padding: 9px 22px;
     font-weight: 600;
-    color: var(--green-900);
+    color: var(--navy-900);
     border: none;
     background-color: transparent;
 }
 .stTabs [data-baseweb="tab"]:hover {
-    color: var(--green-700);
+    color: var(--blue-700);
 }
 .stTabs [aria-selected="true"] {
-    background-color: var(--green-700) !important;
+    background-color: var(--blue-700) !important;
     color: #ffffff !important;
 }
 .stTabs [data-baseweb="tab-highlight"],
@@ -122,19 +229,19 @@ header[data-testid="stHeader"] {
 }
 .stButton > button:hover,
 .stDownloadButton > button:hover {
-    border-color: var(--green-700);
-    color: var(--green-700);
+    border-color: var(--blue-700);
+    color: var(--blue-700);
 }
 .stButton > button[kind="primary"],
 .stFormSubmitButton > button {
-    background-color: var(--green-700) !important;
-    border: 1px solid var(--green-700) !important;
+    background-color: var(--blue-700) !important;
+    border: 1px solid var(--blue-700) !important;
     color: #ffffff !important;
 }
 .stButton > button[kind="primary"]:hover,
 .stFormSubmitButton > button:hover {
-    background-color: var(--green-600) !important;
-    border-color: var(--green-600) !important;
+    background-color: var(--blue-600) !important;
+    border-color: var(--blue-600) !important;
     color: #ffffff !important;
 }
 
@@ -151,8 +258,8 @@ header[data-testid="stHeader"] {
 .stTextInput input:focus,
 .stNumberInput input:focus,
 .stDateInput input:focus {
-    border-color: var(--green-700) !important;
-    box-shadow: 0 0 0 1px var(--green-700) !important;
+    border-color: var(--blue-700) !important;
+    box-shadow: 0 0 0 1px var(--blue-700) !important;
 }
 
 /* ---------- Tabel ---------- */
@@ -167,7 +274,7 @@ div[data-testid="stDataFrame"] {
 /* ---------- Kotak pesan ---------- */
 div[data-testid="stAlert"] {
     border-radius: 12px;
-    border: 1px solid var(--sage-200);
+    border: 1px solid var(--tint-2);
 }
 
 /* ---------- Garis pemisah ---------- */
@@ -187,7 +294,7 @@ div[data-testid="stAlert"] {
     font-size: 12.5px;
 }
 .app-footer a {
-    color: var(--green-700);
+    color: var(--blue-700);
     font-weight: 600;
     text-decoration: none;
 }
