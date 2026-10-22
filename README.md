@@ -1,16 +1,14 @@
-# 🥗 NutriScale SPPG — Platform Analisis & Perencanaan Gizi
+# GiziKu — Platform Perencanaan & Pencatatan Gizi SPPG
 
-**NutriScale SPPG** adalah aplikasi web interaktif berbasis **Python dan Streamlit** yang dikembangkan untuk membantu proses perencanaan, perhitungan, pencatatan, dan analisis gizi pada lingkungan **Satuan Pelayanan Pemenuhan Gizi (SPPG)**.
+**GiziKu** adalah aplikasi web interaktif berbasis **Python dan Streamlit** yang dikembangkan untuk membantu proses perencanaan, perhitungan, pencatatan, dan analisis gizi pada lingkungan **Satuan Pelayanan Pemenuhan Gizi (SPPG)**.
 
 Aplikasi ini mengintegrasikan **database lebih dari 1.200 bahan pangan Indonesia** berdasarkan data **Tabel Komposisi Pangan Indonesia (TKPI)**, kalkulasi berat bahan, nilai gizi makro, pencatatan menu harian, serta visualisasi dan ekspor laporan.
 
 > 🎯 **Goal:** Digitalisasi proses perhitungan dan pencatatan gizi agar lebih terstruktur, konsisten, dan efisien.
 
-### 🌐 Live Demo
+### Tentang Repo Ini
 
-🚀 **[NutriScale SPPG](https://nutriscale.streamlit.app)**
-
-Aplikasi dapat digunakan melalui browser desktop maupun perangkat mobile.
+Repo ini adalah salinan dari proyek terbuka [NutriScale](https://github.com/rayrachman/nutriscale) oleh rayrachman yang di-rebrand menjadi **GiziKu** dengan tampilan baru. Demo versi asli tersedia di https://nutriscale.streamlit.app
 
 ---
 

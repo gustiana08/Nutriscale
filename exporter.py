@@ -1,6 +1,6 @@
 # exporter.py
 """
-Modul ekspor laporan NutriScale — mendukung format Excel (.xlsx), Word (.docx), dan CSV.
+Modul ekspor laporan GiziKu — mendukung format Excel (.xlsx), Word (.docx), dan CSV.
 """
 
 import io

@@ -1,56 +1,196 @@
-/* Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+/* ============================================================
+   GiziKu — tema visual
+   Palet: hijau daun solid di atas kertas hangat, satu aksen
+   amber (logo mark + grafik). Tanpa gradasi, tanpa glow.
+   Font: Plus Jakarta Sans — typeface Indonesia, ramah dan
+   terbaca jelas untuk staf SPPG.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-    --primary-color: #0d6efd;
-    --bg-light: #f8f9fa;
-    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    --green-900: #0c3b24;
+    --green-700: #14663c;
+    --green-600: #1a7a46;
+    --sage-100: #e9f0ea;
+    --sage-200: #d8e4da;
+    --paper: #f7f6f1;
+    --surface: #ffffff;
+    --ink: #1d2521;
+    --muted: #5f6e63;
+    --line: #d9ded6;
+    --amber: #e8a33d;
 }
 
-body {
+.stApp {
+    background-color: var(--paper);
+    color: var(--ink);
     font-family: 'Plus Jakarta Sans', sans-serif;
-    background-color: var(--bg-light);
-    color: #333;
 }
 
-/* Card KPI Nutrisi */
-.kpi-card {
-    background: #ffffff;
-    border-radius: 12px;
-    border: none;
-    box-shadow: var(--card-shadow);
-    padding: 1.5rem;
-    transition: all 0.2s ease;
+header[data-testid="stHeader"] {
+    background-color: transparent;
 }
 
-.kpi-card:hover {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+/* ---------- Header aplikasi ---------- */
+.app-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background-color: var(--green-900);
+    padding: 26px 30px;
+    border-radius: 16px;
+    margin-bottom: 26px;
+}
+.app-header-mark {
+    flex: 0 0 auto;
+    width: 54px;
+    height: 54px;
+    border-radius: 14px;
+    background-color: var(--amber);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.app-header h1 {
+    color: #ffffff;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin: 0 0 4px 0;
+    padding: 0;
+}
+.app-header p {
+    color: #b9d2c0;
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 0;
 }
 
-.kpi-title {
-    font-size: 0.875rem;
-    color: #6c757d;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.kpi-value {
-    font-size: 1.75rem;
+/* ---------- Judul seksi ---------- */
+.stApp h2 {
+    color: var(--green-900);
     font-weight: 700;
-    color: #212529;
+    letter-spacing: -0.3px;
+}
+.stApp h3, .stApp h5 {
+    color: var(--ink);
+    font-weight: 700;
+}
+.stApp [data-testid="stCaptionContainer"] {
+    color: var(--muted);
 }
 
-/* Custom Table Styling */
-.table-nutriscale {
-    background: white;
+/* ---------- Tab utama ---------- */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 6px;
+    background-color: var(--sage-100);
+    padding: 6px;
+    border-radius: 14px;
+    border: 1px solid var(--sage-200);
+}
+.stTabs [data-baseweb="tab"] {
     border-radius: 10px;
-    overflow: hidden;
-    box-shadow: var(--card-shadow);
+    padding: 9px 22px;
+    font-weight: 600;
+    color: var(--green-900);
+    border: none;
+    background-color: transparent;
+}
+.stTabs [data-baseweb="tab"]:hover {
+    color: var(--green-700);
+}
+.stTabs [aria-selected="true"] {
+    background-color: var(--green-700) !important;
+    color: #ffffff !important;
+}
+.stTabs [data-baseweb="tab-highlight"],
+.stTabs [data-baseweb="tab-border"] {
+    display: none;
 }
 
-.table-nutriscale thead {
-    background-color: #eef2f7;
-    color: #495057;
+/* ---------- Tombol ---------- */
+.stButton > button,
+.stDownloadButton > button {
+    border-radius: 10px;
     font-weight: 600;
+    padding: 9px 22px;
+    border: 1px solid var(--line);
+    background-color: var(--surface);
+    color: var(--ink);
+    box-shadow: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.stButton > button:hover,
+.stDownloadButton > button:hover {
+    border-color: var(--green-700);
+    color: var(--green-700);
+}
+.stButton > button[kind="primary"],
+.stFormSubmitButton > button {
+    background-color: var(--green-700) !important;
+    border: 1px solid var(--green-700) !important;
+    color: #ffffff !important;
+}
+.stButton > button[kind="primary"]:hover,
+.stFormSubmitButton > button:hover {
+    background-color: var(--green-600) !important;
+    border-color: var(--green-600) !important;
+    color: #ffffff !important;
+}
+
+/* ---------- Input ---------- */
+.stTextInput input,
+.stNumberInput input,
+.stDateInput input,
+.stSelectbox div[data-baseweb="select"] {
+    background-color: var(--surface) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 10px !important;
+    color: var(--ink) !important;
+}
+.stTextInput input:focus,
+.stNumberInput input:focus,
+.stDateInput input:focus {
+    border-color: var(--green-700) !important;
+    box-shadow: 0 0 0 1px var(--green-700) !important;
+}
+
+/* ---------- Tabel ---------- */
+div[data-testid="stDataEditor"],
+div[data-testid="stDataFrame"] {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: var(--surface);
+}
+
+/* ---------- Kotak pesan ---------- */
+div[data-testid="stAlert"] {
+    border-radius: 12px;
+    border: 1px solid var(--sage-200);
+}
+
+/* ---------- Garis pemisah ---------- */
+.stApp hr {
+    border-color: var(--line);
+}
+
+/* ---------- Footer ---------- */
+.app-footer {
+    text-align: center;
+    color: var(--muted);
+    padding: 14px 10px 4px;
+    font-size: 14px;
+    line-height: 1.6;
+}
+.app-footer span {
+    font-size: 12.5px;
+}
+.app-footer a {
+    color: var(--green-700);
+    font-weight: 600;
+    text-decoration: none;
+}
+.app-footer a:hover {
+    text-decoration: underline;
 }

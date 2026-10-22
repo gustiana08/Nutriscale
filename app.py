@@ -17,10 +17,10 @@ from exporter import export_to_excel, export_to_csv, export_to_word
 # Inisialisasi Database
 init_db()
 
-st.set_page_config(page_title="NutriScale SPPG - Perencanaan & Log Gizi", page_icon="🥗", layout="wide")
+st.set_page_config(page_title="GiziKu — Perencanaan & Pencatatan Gizi SPPG", page_icon="🥗", layout="wide")
 
 # =========================================================
-# STYLING TEMA FULL BACKGROUND BIRU SPPG (CUSTOM CSS)
+# TEMA VISUAL — style.css + .streamlit/config.toml
 # =========================================================
 
 # Muat CSS eksternal jika ada
@@ -30,109 +30,23 @@ if os.path.exists(_CSS_PATH):
     with open(_CSS_PATH, "r", encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# CSS inline untuk tema Streamlit
-st.markdown("""
-<style>
-    /* 1. Latar Belakang Utama Seluruh Aplikasi (Full Background Biru Soft) */
-    .stApp {
-        background-color: #e0f2fe !important;
-    }
-
-    /* 2. Header Top Bar Streamlit */
-    header[data-testid="stHeader"] {
-        background-color: rgba(0, 0, 0, 0) !important;
-    }
-    
-    /* 3. Banner Header Utama SPPG */
-    .sppg-header {
-        background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
-        padding: 24px 30px;
-        border-radius: 14px;
-        color: white;
-        margin-bottom: 25px;
-        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.25);
-    }
-    .sppg-header h1 {
-        color: #ffffff !important;
-        font-weight: 700;
-        margin-bottom: 4px;
-        font-size: 28px;
-    }
-    .sppg-header p {
-        color: #bae6fd;
-        margin-bottom: 0;
-        font-size: 15px;
-    }
-
-    /* 4. Container Tab Navigasi Utama */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-        background-color: #bae6fd;
-        padding: 8px 12px;
-        border-radius: 12px;
-        border: 1px solid #7dd3fc;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px;
-        padding: 8px 20px;
-        font-weight: 600;
-        color: #0369a1;
-        border: none;
-    }
-
-    .stTabs [aria-selected="true"] {
-        background-color: #1d4ed8 !important;
-        color: #ffffff !important;
-        box-shadow: 0 4px 8px rgba(29, 78, 216, 0.3);
-    }
-
-    /* 5. Tombol Utama (Primary) */
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
-        color: white;
-        border-radius: 8px;
-        border: none;
-        font-weight: 600;
-        padding: 8px 22px;
-        box-shadow: 0 3px 6px rgba(29, 78, 216, 0.25);
-    }
-    .stButton > button[kind="primary"]:hover {
-        background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
-    }
-
-    /* 6. Form Submit Button */
-    .stFormSubmitButton > button {
-        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
-        color: white !important;
-        border-radius: 8px !important;
-        border: none !important;
-        font-weight: 600 !important;
-    }
-
-    /* 7. Input Field, Selectbox & Data Editor */
-    .stTextInput input, .stSelectbox div[data-baseweb="select"], .stDateInput input, .stNumberInput input {
-        background-color: #ffffff !important;
-        border-radius: 8px !important;
-        border: 1px solid #7dd3fc !important;
-    }
-
-    div[data-testid="stDataEditor"] {
-        border-radius: 10px;
-        overflow: hidden;
-        border: 1px solid #7dd3fc;
-        background-color: #ffffff;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Seluruh tema visual tinggal di style.css dan .streamlit/config.toml
 
 # ---------------------------------------------------------
 # HEADER BANNER APLIKASI
 # ---------------------------------------------------------
 st.markdown("""
-<div class="sppg-header">
-    <h1>🥗 NutriScale SPPG</h1>
-    <p>Platform Analisis Gizi Presisi, Pencatatan Sajian Harian & Manajemen Bahan Pangan</p>
+<div class="app-header">
+    <div class="app-header-mark">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 19C5 10.5 11.5 4.5 20 4.5c0 8.5-6 14.5-15 14.5Z"/>
+            <path d="M5 19c3-5.5 7-9.5 12-12"/>
+        </svg>
+    </div>
+    <div>
+        <h1>GiziKu</h1>
+        <p>Perencanaan menu, pencatatan sajian harian, dan pengelolaan bahan pangan untuk Satuan Pelayanan Pemenuhan Gizi (SPPG).</p>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -140,16 +54,16 @@ st.markdown("""
 # TIGA TAB UTAMA APLIKASI
 # ---------------------------------------------------------
 tab1, tab2, tab3 = st.tabs([
-    "📝 Input Menu Harian", 
-    "📊 Laporan & Rekapitulasi Gizi", 
-    "📚 Database & Kelola Bahan"
+    "Input Menu Harian", 
+    "Laporan & Rekapitulasi Gizi", 
+    "Database & Kelola Bahan"
 ])
 
 # =========================================================
 # TAB 1: INPUT MENU HARIAN
 # =========================================================
 with tab1:
-    st.subheader("📋 Pencatatan Menu Sajian Harian (Standar SPPG)")
+    st.subheader("Pencatatan Menu Sajian Harian")
     
     col_tgl, col_siklus, col_porsi = st.columns(3)
     with col_tgl:
@@ -162,8 +76,8 @@ with tab1:
     nama_menu = st.text_input("Nama Menu / Hidangan", placeholder="Contoh: Ayam Goreng Mentega + Nasi Putih")
     
     st.markdown("---")
-    st.markdown("### 🔍 Cari & Tambah Bahan Makanan")
-    st.caption("💡 *Ketik kata kunci bahan, pilih opsi yang cocok, lalu tentukan perkiraan berat kotor awal.*")
+    st.markdown("### Cari & Tambah Bahan Makanan")
+    st.caption("Ketik kata kunci bahan, pilih yang cocok, lalu tentukan berat kotor awal.")
 
     # Inisialisasi Keranjang Menu Harian di Session State
     if 'keranjang_sppg' not in st.session_state:
@@ -183,7 +97,7 @@ with tab1:
             bahan_terpilih = opsi_dict[pilihan_label]
         else:
             if keyword_cari.strip():
-                st.warning("⚠️ Tidak ada bahan makanan yang cocok dengan kata kunci tersebut.")
+                st.warning("Tidak ada bahan makanan yang cocok dengan kata kunci tersebut.")
             bahan_terpilih = None
 
     with col_kotor:
@@ -192,7 +106,7 @@ with tab1:
     with col_btn:
         st.write("")
         st.write("")
-        if st.button("➕ Tambah", type="primary", use_container_width=True):
+        if st.button("Tambah", type="primary", use_container_width=True):
             if bahan_terpilih:
                 bdd = float(bahan_terpilih['bdd']) if bahan_terpilih['bdd'] > 0 else 100.0
                 
@@ -206,14 +120,14 @@ with tab1:
                     "lem_100": float(bahan_terpilih['lemak']),
                     "karb_100": float(bahan_terpilih['karbohidrat'])
                 })
-                st.toast(f"✅ Berhasil menambahkan {bahan_terpilih['nama']}!", icon="🎉")
+                st.toast(f"{bahan_terpilih['nama']} ditambahkan ke menu.")
             else:
                 st.error("Silakan pilih bahan makanan terlebih dahulu.")
 
     # 2. TABEL SAJIAN INTERAKTIF (BERAT KOTOR BISA DIEDIT LANGSUNG)
     st.markdown("---")
-    st.markdown("##### 📊 Tabel Sajian Menu & Kalkulasi Gizi")
-    st.caption("✍️ **Tips Ahli Gizi:** Anda dapat mengubah angka pada kolom **'Berat Kotor (g)'** langsung di tabel bawah ini. Nilai gizi akan otomatis menyesuaikan kebutuhan target!")
+    st.markdown("##### Tabel Sajian Menu & Kalkulasi Gizi")
+    st.caption("Tips: ubah angka pada kolom **Berat Kotor (g)** langsung di tabel — nilai gizi menyesuaikan otomatis.")
 
     if st.session_state.keranjang_sppg:
         df_cart = pd.DataFrame(st.session_state.keranjang_sppg)
@@ -250,7 +164,7 @@ with tab1:
             key="tabel_menu_interaktif",
             disabled=["Komposisi Makanan", "% BDD", "Berat Bersih (g)", "Energi (kcal)", "Protein (g)", "Lemak (g)", "Karbohidrat (g)"],
             column_config={
-                "Berat Kotor (g)": st.column_config.NumberColumn("Berat Kotor (g) ✏️", min_value=1.0, step=1.0, required=True),
+                "Berat Kotor (g)": st.column_config.NumberColumn("Berat Kotor (g)", min_value=1.0, step=1.0, required=True),
                 "% BDD": st.column_config.NumberColumn("% BDD", format="%.1f%%"),
             }
         )
@@ -287,15 +201,15 @@ with tab1:
 
         col_kosong, col_simpan = st.columns([1, 2])
         with col_kosong:
-            if st.button("🗑️ Kosongkan Tabel Menu"):
+            if st.button("Kosongkan Tabel"):
                 st.session_state.keranjang_sppg = []
                 st.rerun()
 
         with col_simpan:
-            if st.button("💾 Simpan Menu Hari Ini ke Database", type="primary", use_container_width=True):
+            if st.button("Simpan Menu Hari Ini", type="primary", use_container_width=True):
                 # Validasi: nama menu wajib diisi
                 if not nama_menu.strip():
-                    st.error("⚠️ **Nama Menu / Hidangan** wajib diisi sebelum menyimpan!")
+                    st.error("**Nama Menu / Hidangan** wajib diisi sebelum menyimpan.")
                 else:
                     daftar_bahan = []
                     for _, row in edited_cart.iterrows():
@@ -312,10 +226,10 @@ with tab1:
                         })
                     
                     simpan_menu_harian(tgl_saji.strftime("%Y-%m-%d"), siklus, porsi_makan, daftar_bahan)
-                    st.success("🎉 Data menu harian berhasil disimpan ke database!")
+                    st.success("Data menu harian berhasil disimpan.")
                     st.session_state.keranjang_sppg = []
     else:
-        st.caption("📌 *Belum ada bahan makanan yang ditambahkan. Gunakan pencarian di atas untuk memasukkan bahan baku.*")
+        st.caption("Belum ada bahan makanan yang ditambahkan. Gunakan pencarian di atas untuk memasukkan bahan baku.")
 
 # =========================================================
 # TAB 2: LAPORAN & REKAPITULASI
@@ -329,7 +243,7 @@ with tab2:
     with col_f2:
         tgl_selesai = st.date_input("Sampai Tanggal", datetime.now())
         
-    if st.button("🔍 Tampilkan Laporan", type="primary"):
+    if st.button("Tampilkan Laporan", type="primary"):
         df_laporan = ambil_laporan_harian(tgl_mulai.strftime("%Y-%m-%d"), tgl_selesai.strftime("%Y-%m-%d"))
         
         if df_laporan.empty:
@@ -360,19 +274,19 @@ with tab2:
         st.dataframe(rekap_harian.round(1), use_container_width=True)
         
         st.markdown("### Grafik Asupan Energi Harian (kcal)")
-        st.line_chart(rekap_harian.set_index("tanggal")["energi_kcal"])
+        st.line_chart(rekap_harian.set_index("tanggal")["energi_kcal"], color="#e8a33d")
         
         st.markdown("### Rincian Lengkap Bahan & Menu (Laporan SPPG)")
         st.dataframe(df_laporan, use_container_width=True)
         
         # Tombol Ekspor — CSV, Excel, dan Word
-        st.markdown("### 📥 Unduh Laporan")
+        st.markdown("### Unduh Laporan")
         col_dl1, col_dl2, col_dl3 = st.columns(3)
         
         with col_dl1:
             csv_data = export_to_csv(df_laporan)
             st.download_button(
-                label="📄 Unduh CSV",
+                label="Unduh CSV",
                 data=csv_data,
                 file_name=f"Laporan_Gizi_SPPG_{tgl_mulai_str}_sd_{tgl_selesai_str}.csv",
                 mime="text/csv",
@@ -382,7 +296,7 @@ with tab2:
         with col_dl2:
             excel_data = export_to_excel(df_laporan)
             st.download_button(
-                label="📊 Unduh Excel",
+                label="Unduh Excel",
                 data=excel_data,
                 file_name=f"Laporan_Gizi_SPPG_{tgl_mulai_str}_sd_{tgl_selesai_str}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -392,7 +306,7 @@ with tab2:
         with col_dl3:
             word_data = export_to_word(df_laporan, tgl_mulai_str, tgl_selesai_str)
             st.download_button(
-                label="📝 Unduh Word",
+                label="Unduh Word",
                 data=word_data,
                 file_name=f"Laporan_Gizi_SPPG_{tgl_mulai_str}_sd_{tgl_selesai_str}.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -403,13 +317,13 @@ with tab2:
 # TAB 3: DATABASE & KELOLA BAHAN PANGAN
 # =========================================================
 with tab3:
-    st.subheader("📚 Daftar Database Bahan Pangan Terdaftar")
+    st.subheader("Database Bahan Pangan")
     
-    sub_tab1, sub_tab2 = st.tabs(["🔍 List & Edit Bahan", "➕ Tambah Bahan Baru"])
+    sub_tab1, sub_tab2 = st.tabs(["List & Edit Bahan", "Tambah Bahan Baru"])
     
     # --- SUB-TAB 1: LIST & EDIT BAHAN ---
     with sub_tab1:
-        search_kw = st.text_input("🔍 Cari Nama Bahan Makanan:", "", placeholder="Contoh: Ayam, Nasi, Tempe...").strip()
+        search_kw = st.text_input("Cari Nama Bahan Makanan:", "", placeholder="Contoh: Ayam, Nasi, Tempe...").strip()
         
         conn = sqlite3.connect(DB_PATH)
         if search_kw:
@@ -423,7 +337,7 @@ with tab3:
         st.caption(f"Menampilkan {len(df_db)} bahan pangan.")
         
         if not df_db.empty:
-            st.info("💡 **Petunjuk:** Anda dapat mengubah angka nutrisi / BDD langsung di dalam tabel bawah ini, lalu klik **'Simpan Perubahan Data'**.")
+            st.info("**Petunjuk:** ubah angka nutrisi / BDD langsung di dalam tabel, lalu klik **Simpan Perubahan Data**.")
             
             edited_df_db = st.data_editor(
                 df_db,
@@ -441,7 +355,7 @@ with tab3:
                 }
             )
             
-            if st.button("💾 Simpan Perubahan Data", type="primary"):
+            if st.button("Simpan Perubahan Data", type="primary"):
                 for _, row in edited_df_db.iterrows():
                     update_bahan_pangan(
                         int(row["id"]), 
@@ -452,7 +366,7 @@ with tab3:
                         float(row["karbohidrat"]),
                         float(row["bdd"])
                     )
-                st.success("✅ Perubahan data bahan pangan berhasil disimpan!")
+                st.success("Perubahan data bahan pangan berhasil disimpan.")
                 st.rerun()
         else:
             st.warning("Bahan makanan tidak ditemukan di database.")
@@ -473,14 +387,14 @@ with tab3:
             with col_c:
                 tb_bdd = st.number_input("% BDD (Bagian Dapat Dimakan)", min_value=1.0, max_value=100.0, value=100.0, step=1.0)
                 
-            submitted_tab3 = st.form_submit_button("➕ Simpan Bahan Baru", type="primary")
+            submitted_tab3 = st.form_submit_button("Simpan Bahan Baru", type="primary")
             
             if submitted_tab3:
                 if not tb_nama.strip():
-                    st.warning("⚠️ Nama bahan makanan wajib diisi!")
+                    st.warning("Nama bahan makanan wajib diisi.")
                 else:
                     tambah_bahan_custom(tb_nama, tb_kal, tb_prot, tb_lemak, tb_karbo, tb_bdd)
-                    st.success(f"🎉 **{tb_nama}** berhasil ditambahkan ke database!")
+                    st.success(f"**{tb_nama}** berhasil ditambahkan ke database.")
                     st.rerun()
 
 # ---------------------------------------------------------
@@ -488,10 +402,8 @@ with tab3:
 # ---------------------------------------------------------
 st.markdown("---")
 st.markdown("""
-<div style="text-align: center; color: #0369a1; padding: 10px; font-size: 14px;">
-    Developed with ❤️ SPPG Ahli Gizi by 
-    <a href="https://github.com/rayrachman" target="_blank" style="color: #1d4ed8; font-weight: bold; text-decoration: none;">
-        @rayrachman
-    </a> 🚀
+<div class="app-footer">
+    GiziKu — platform pencatatan gizi untuk SPPG.<br>
+    <span>Berdasarkan proyek terbuka <a href="https://github.com/rayrachman/nutriscale" target="_blank">NutriScale</a> oleh @rayrachman.</span>
 </div>
 """, unsafe_allow_html=True)

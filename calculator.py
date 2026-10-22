@@ -1,6 +1,6 @@
 # calculator.py
 """
-Modul kalkulasi gizi NutriScale — konversi berat kotor/bersih dan analisis makronutrisi.
+Modul kalkulasi gizi GiziKu — konversi berat kotor/bersih dan analisis makronutrisi.
 """
 
 
