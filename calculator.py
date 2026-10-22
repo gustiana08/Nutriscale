@@ -53,6 +53,48 @@ def hitung_nutrisi_bahan(berat_bersih: float, kalori_per100: float, protein_per1
     }
 
 
+def perbarui_keranjang(keranjang_lama: list, baris_editor: list):
+    """
+    Menyinkronkan keranjang menu dengan hasil edit tabel data_editor.
+
+    Args:
+        keranjang_lama: List dict item keranjang saat ini (tidak dimutasi).
+        baris_editor: List tuple (index, berat_kotor) dari DataFrame hasil editor.
+
+    Returns:
+        Tuple (keranjang_baru, berubah):
+        - Baris yang hilang dari editor dianggap dihapus pengguna.
+        - Index di luar rentang (baris tambahan kosong bawaan editor) diabaikan
+          dan ditandai berubah agar dibersihkan lewat rerun.
+        - Berat NaN / <= 0 dianggap tidak valid dan kembali ke berat lama.
+        - Berat dibulatkan 1 desimal (sesuai presisi tampilan tabel).
+    """
+    import math
+
+    berubah = False
+    keranjang_baru = []
+    for index, berat in baris_editor:
+        if index is None or index < 0 or index >= len(keranjang_lama):
+            berubah = True
+            continue
+        item = dict(keranjang_lama[index])
+        berat_lama = float(item["Berat Kotor (g)"])
+        try:
+            berat_baru = float(berat)
+        except (TypeError, ValueError):
+            berat_baru = berat_lama
+        if math.isnan(berat_baru) or berat_baru <= 0:
+            berat_baru = berat_lama
+        berat_baru = round(berat_baru, 1)
+        if berat_baru != berat_lama:
+            berubah = True
+        item["Berat Kotor (g)"] = berat_baru
+        keranjang_baru.append(item)
+    if len(keranjang_baru) != len(keranjang_lama):
+        berubah = True
+    return keranjang_baru, berubah
+
+
 def analisis_menu(daftar_bahan_terpilih: list, target_kebutuhan: dict = None):
     """
     Menganalisis keseluruhan menu dan membandingkan dengan target AKG.

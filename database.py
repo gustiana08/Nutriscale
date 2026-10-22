@@ -165,6 +165,29 @@ def simpan_menu_harian(tanggal, siklus_hari, waktu_makan, daftar_bahan):
     conn.commit()
     conn.close()
 
+def hapus_bahan_pangan(id_bahan: int):
+    """Menghapus satu bahan pangan berdasarkan ID."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM bahan_pangan WHERE id = ?", (id_bahan,))
+    conn.commit()
+    conn.close()
+    return True
+
+def ambil_log_dengan_id(tanggal_awal, tanggal_akhir):
+    """Mengambil log menu harian termasuk kolom id (untuk keperluan hapus entri)."""
+    conn = sqlite3.connect(DB_PATH)
+    query = """
+        SELECT id, tanggal, siklus_hari, waktu_makan, nama_menu, bahan_pangan,
+               berat_kotor, berat_bersih, bdd, energi_kcal, protein_g, lemak_g, karbo_g
+        FROM log_menu_harian
+        WHERE tanggal BETWEEN ? AND ?
+        ORDER BY tanggal ASC, id ASC
+    """
+    df = pd.read_sql_query(query, conn, params=(tanggal_awal, tanggal_akhir))
+    conn.close()
+    return df
+
 def hapus_log_menu(log_id: int):
     """Menghapus satu entri log menu harian berdasarkan ID."""
     conn = sqlite3.connect(DB_PATH)
