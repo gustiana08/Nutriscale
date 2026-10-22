@@ -214,3 +214,16 @@ GitHub: [@rayrachman](https://github.com/rayrachman)
 NutriScale is a software project intended to support data management, calculation, and reporting workflows.
 
 The application does not replace professional judgment from qualified nutritionists or other healthcare professionals.
+
+---
+
+## 🔧 Catatan Perbaikan (Audit — Oktober 2026)
+
+Perbaikan bug mayor hasil audit aplikasi live:
+
+* Edit berat bahan di tabel sajian sekarang menghitung ulang berat bersih & nilai gizi secara langsung.
+* Laporan lama dibersihkan otomatis saat filter baru menghasilkan data kosong / rentang tanggal tidak valid.
+* Grafik energi harian memakai sumbu Y yang selalu mulai dari 0.
+* Berat desimal tampil utuh di tabel (mis. 12,5 g tidak lagi tampil sebagai 12).
+* Ditambahkan fitur hapus entri laporan (Tab Laporan) dan hapus bahan pangan (Tab Database), masing-masing dengan konfirmasi.
+* Pesan keberhasilan simpan/tambah data kini tampil konsisten setelah halaman dimuat ulang.
