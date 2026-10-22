@@ -22,8 +22,13 @@ def parse_float(val):
         return 0.0
 
 def setup_database():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     cursor = conn.cursor()
+    # Kunci tulis sejak awal (BEGIN IMMEDIATE): mencegah seeding ganda saat
+    # beberapa sesi membuka aplikasi bersamaan pada database yang masih
+    # kosong — tanpa kunci ini tiap sesi melihat tabel kosong dan sama-sama
+    # mengimpor seluruh CSV (pernah menghasilkan 4x duplikasi baris seed).
+    cursor.execute("BEGIN IMMEDIATE")
     
     # 1. Buat Tabel Bahan Pangan
     cursor.execute('''
@@ -58,7 +63,15 @@ def setup_database():
         karbo_g REAL
     )
     ''')
-    conn.commit()
+
+    # 2b. Bersihkan duplikat baris seed (is_custom = 0) bila ada — sisakan
+    # satu baris per nama (id terkecil). Baris custom pengguna tidak disentuh.
+    cursor.execute('''
+    DELETE FROM bahan_pangan
+    WHERE is_custom = 0 AND id NOT IN (
+        SELECT MIN(id) FROM bahan_pangan WHERE is_custom = 0 GROUP BY nama
+    )
+    ''')
     
     # Impor data jika tabel bahan_pangan masih kosong
     cursor.execute("SELECT COUNT(*) FROM bahan_pangan")
@@ -96,11 +109,11 @@ def setup_database():
                 INSERT INTO bahan_pangan (nama, kalori, protein, lemak, karbohidrat, bdd, gambar, is_custom)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ''', data_to_insert)
-                conn.commit()
                 print(f"✅ Berhasil mengimpor {len(data_to_insert)} bahan pangan dari Tabel Komposisi Pangan Indonesia!")
             except Exception as e:
                 print(f"⚠️ Gagal membaca file nutrition.csv: {e}")
             
+    conn.commit()
     conn.close()
 
 def init_db():
