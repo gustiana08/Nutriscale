@@ -72,6 +72,11 @@ def setup_database():
         SELECT MIN(id) FROM bahan_pangan WHERE is_custom = 0 GROUP BY nama
     )
     ''')
+
+    # 2c. Perbaiki BDD baris seed yang di luar rentang sah (0, 100] pada
+    # database lama — di CSV sumber ada makanan olahan tercatat BDD
+    # 110-400%, yang menggelembungkan hitungan gizi.
+    cursor.execute("UPDATE bahan_pangan SET bdd = 100 WHERE is_custom = 0 AND (bdd > 100 OR bdd <= 0)")
     
     # Impor data jika tabel bahan_pangan masih kosong
     cursor.execute("SELECT COUNT(*) FROM bahan_pangan")
@@ -100,7 +105,7 @@ def setup_database():
                             protein,
                             lemak,
                             karbo,
-                            bdd_val if bdd_val > 0 else 100.0,
+                            bdd_val if 0 < bdd_val <= 100 else 100.0,
                             '',
                             0
                         ))
@@ -120,12 +125,18 @@ def init_db():
     """Inisialisasi database — cukup dipanggil sekali saat startup aplikasi."""
     setup_database()
 
-def cari_bahan_pangan(keyword: str):
-    """Mencari bahan pangan berdasarkan kata kunci nama."""
+def cari_bahan_pangan(keyword: str, limit: int = 50):
+    """Mencari bahan pangan berdasarkan kata kunci nama.
+
+    Karakter khusus LIKE (%, _, \\) pada kata kunci diperlakukan sebagai teks
+    biasa, bukan wildcard. Hasil diurutkan nama dan dibatasi `limit` baris —
+    panggil dengan limit+1 untuk tahu apakah masih ada kecocokan lain.
+    """
+    kata_aman = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    query = "SELECT id, nama, kalori, protein, lemak, karbohidrat, bdd, is_custom FROM bahan_pangan WHERE nama LIKE ? LIMIT 20"
-    cursor.execute(query, (f"%{keyword}%",))
+    query = "SELECT id, nama, kalori, protein, lemak, karbohidrat, bdd, is_custom FROM bahan_pangan WHERE nama LIKE ? ESCAPE '\\' ORDER BY nama LIMIT ?"
+    cursor.execute(query, (f"%{kata_aman}%", int(limit)))
     rows = cursor.fetchall()
     conn.close()
     
@@ -134,13 +145,21 @@ def cari_bahan_pangan(keyword: str):
         "protein": r[3], "lemak": r[4], "karbohidrat": r[5], "bdd": r[6], "is_custom": r[7]
     } for r in rows]
 
+def _bdd_valid(bdd) -> float:
+    """BDD yang sah: 0 < bdd <= 100. Nilai di luar rentang dijepit masuk."""
+    try:
+        bdd = float(bdd)
+    except (TypeError, ValueError):
+        return 100.0
+    return min(max(bdd, 1.0), 100.0)
+
 def tambah_bahan_custom(nama: str, kalori: float, protein: float, lemak: float, karbohidrat: float, bdd: float = 100.0):
     """Menambahkan bahan pangan baru (kustom) ke database."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO bahan_pangan (nama, kalori, protein, lemak, karbohidrat, bdd, is_custom) VALUES (?, ?, ?, ?, ?, ?, 1)",
-        (nama, kalori, protein, lemak, karbohidrat, bdd)
+        (nama, kalori, protein, lemak, karbohidrat, _bdd_valid(bdd))
     )
     conn.commit()
     conn.close()
@@ -155,10 +174,30 @@ def update_bahan_pangan(id_bahan: int, nama: str, kalori: float, protein: float,
     SET nama = ?, kalori = ?, protein = ?, lemak = ?, karbohidrat = ?, bdd = ?
     WHERE id = ?
     """
-    cursor.execute(query, (nama, kalori, protein, lemak, karbohidrat, bdd, id_bahan))
+    cursor.execute(query, (nama, kalori, protein, lemak, karbohidrat, _bdd_valid(bdd), id_bahan))
     conn.commit()
     conn.close()
     return True
+
+def update_bahan_massal(baris: list):
+    """Memperbarui banyak bahan sekaligus dalam SATU transaksi (atomik).
+
+    Args:
+        baris: list tuple (id, nama, kalori, protein, lemak, karbohidrat, bdd).
+    Semua baris tersimpan, atau tidak sama sekali bila terjadi kesalahan —
+    menggantikan pola lama satu koneksi + commit per baris.
+    """
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
+    cursor.executemany(
+        "UPDATE bahan_pangan SET nama = ?, kalori = ?, protein = ?, lemak = ?, karbohidrat = ?, bdd = ? WHERE id = ?",
+        [(nama, kalori, protein, lemak, karbohidrat, _bdd_valid(bdd), int(id_bahan))
+         for (id_bahan, nama, kalori, protein, lemak, karbohidrat, bdd) in baris],
+    )
+    conn.commit()
+    conn.close()
+    return len(baris)
 
 def simpan_menu_harian(tanggal, siklus_hari, waktu_makan, daftar_bahan):
     """Menyimpan log menu harian ke database."""

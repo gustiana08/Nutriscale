@@ -1,6 +1,13 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+WIB = timezone(timedelta(hours=7))
+
+def tanggal_hari_ini():
+    """Tanggal hari ini menurut WIB (server Streamlit berjalan di UTC,
+    jadi datetime.now() polos bisa mundur sehari pada pagi hari WIB)."""
+    return datetime.now(WIB).date()
 import sqlite3
 from database import (
     init_db, 
@@ -9,6 +16,7 @@ from database import (
     cari_bahan_pangan, 
     tambah_bahan_custom, 
     update_bahan_pangan,
+    update_bahan_massal,
     hapus_bahan_pangan,
     hapus_log_menu,
     ambil_log_dengan_id,
@@ -74,9 +82,15 @@ with tab1:
     
     col_tgl, col_siklus, col_porsi = st.columns(3)
     with col_tgl:
-        tgl_saji = st.date_input("Tanggal Penyajian", datetime.now())
+        tgl_saji = st.date_input("Tanggal Penyajian", tanggal_hari_ini())
     with col_siklus:
-        siklus = st.selectbox("Siklus Hari", ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"])
+        # Siklus Hari mengikuti nama hari dari tanggal yang dipilih. Pilihan
+        # manual pengguna tetap dihormati selama tanggalnya tidak berubah.
+        HARI_ID = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+        if st.session_state.get("_tgl_untuk_siklus") != tgl_saji:
+            st.session_state["pilih_siklus"] = HARI_ID[tgl_saji.weekday()]
+            st.session_state["_tgl_untuk_siklus"] = tgl_saji
+        siklus = st.selectbox("Siklus Hari", HARI_ID, key="pilih_siklus")
     with col_porsi:
         porsi_makan = st.selectbox("Porsi Makanan", ["Standard / Biasa", "Kecil", "Besar"])
 
@@ -93,7 +107,10 @@ with tab1:
     # 1. FORM INPUT PENCARIAN & PENAMBAHAN BAHAN
     keyword_cari = st.text_input("Ketik Kata Kunci Bahan (misal: Ayam, Nasi, Telur, Daging):", "", key="input_cari_bahan")
     
-    data_hasil_search = cari_bahan_pangan(keyword_cari.strip()) if keyword_cari.strip() else []
+    data_hasil_search = cari_bahan_pangan(keyword_cari.strip(), limit=51) if keyword_cari.strip() else []
+    hasil_dibatasi = len(data_hasil_search) > 50
+    if hasil_dibatasi:
+        data_hasil_search = data_hasil_search[:50]
     
     col_pilih, col_kotor, col_btn = st.columns([4, 2, 1])
     
@@ -102,6 +119,8 @@ with tab1:
             opsi_dict = {f"{b['nama']} (BDD: {b['bdd']}%)": b for b in data_hasil_search}
             pilihan_label = st.selectbox("Pilih Bahan dari List Hasil Pencarian:", list(opsi_dict.keys()))
             bahan_terpilih = opsi_dict[pilihan_label]
+            if hasil_dibatasi:
+                st.caption("Menampilkan 50 hasil pertama — persempit kata kunci untuk melihat bahan lainnya.")
         else:
             if keyword_cari.strip():
                 st.warning("Tidak ada bahan makanan yang cocok dengan kata kunci tersebut.")
@@ -246,9 +265,9 @@ with tab2:
     
     col_f1, col_f2 = st.columns(2)
     with col_f1:
-        tgl_mulai = st.date_input("Dari Tanggal", datetime.now())
+        tgl_mulai = st.date_input("Dari Tanggal", tanggal_hari_ini())
     with col_f2:
-        tgl_selesai = st.date_input("Sampai Tanggal", datetime.now())
+        tgl_selesai = st.date_input("Sampai Tanggal", tanggal_hari_ini())
         
     if 'flash_tab2' in st.session_state:
         st.success(st.session_state.pop('flash_tab2'))
@@ -417,21 +436,25 @@ with tab3:
             
             if st.button("Simpan Perubahan Data", type="primary"):
                 terlewat = 0
+                baris_valid = []
                 for _, row in edited_df_db.iterrows():
                     # Lewati baris yang ada sel kosongnya (NaN) — jangan sampai
                     # merusak data atau bikin proses simpan gagal di tengah jalan.
                     if pd.isna(row["nama"]) or any(pd.isna(row[k]) for k in ["kalori", "protein", "lemak", "karbohidrat", "bdd"]):
                         terlewat += 1
                         continue
-                    update_bahan_pangan(
-                        int(row["id"]), 
-                        row["nama"], 
-                        float(row["kalori"]), 
-                        float(row["protein"]), 
-                        float(row["lemak"]), 
+                    baris_valid.append((
+                        int(row["id"]),
+                        row["nama"],
+                        float(row["kalori"]),
+                        float(row["protein"]),
+                        float(row["lemak"]),
                         float(row["karbohidrat"]),
                         float(row["bdd"])
-                    )
+                    ))
+                # Satu transaksi untuk semua baris: tersimpan semua atau
+                # tidak sama sekali (atomik).
+                update_bahan_massal(baris_valid)
                 pesan_simpan = "Perubahan data bahan pangan berhasil disimpan."
                 if terlewat:
                     pesan_simpan += f" {terlewat} baris dilewati karena ada sel yang kosong."
