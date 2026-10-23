@@ -41,6 +41,10 @@ def buat_koneksi():
         return libsql.connect(database=url)
     return sqlite3.connect(DB_PATH, timeout=30)
 
+def _adalah_lokal():
+    """True bila database aktif adalah SQLite lokal (bukan Turso)."""
+    return _turso_config()[0] is None
+
 def _mulai_tulis_langsung(cursor):
     """BEGIN IMMEDIATE (kunci tulis sejak awal). Pada driver yang
     mengelola transaksi sendiri (libsql remote) perintah ini bisa
@@ -63,13 +67,22 @@ def parse_float(val):
         return 0.0
 
 def setup_database():
+    lokal = _adalah_lokal()
     conn = buat_koneksi()
     cursor = conn.cursor()
-    # Kunci tulis sejak awal (BEGIN IMMEDIATE): mencegah seeding ganda saat
-    # beberapa sesi membuka aplikasi bersamaan pada database yang masih
-    # kosong — tanpa kunci ini tiap sesi melihat tabel kosong dan sama-sama
-    # mengimpor seluruh CSV (pernah menghasilkan 4x duplikasi baris seed).
-    _mulai_tulis_langsung(cursor)
+    # Kunci tulis sejak awal (BEGIN IMMEDIATE) HANYA untuk SQLite lokal:
+    # mencegah seeding ganda saat beberapa sesi membuka aplikasi bersamaan
+    # pada database yang masih kosong — tanpa kunci ini tiap sesi melihat
+    # tabel kosong dan sama-sama mengimpor seluruh CSV (pernah menghasilkan
+    # 4x duplikasi baris seed). Pada Turso (remote) transaksi interaktif
+    # yang menggantung selama parse CSV yang lambat akan di-rollback oleh
+    # server karena stream menganggur ("interactive transaction was rolled
+    # back because the stream was idle for too long", terlihat di log
+    # Streamlit Cloud 2026-10-24) — di sana tiap pernyataan berjalan
+    # autocommit yang cepat, dan langkah dedupe di bawah membersihkan
+    # sisa duplikasi bila dua sesi sempat seeding bersamaan.
+    if lokal:
+        _mulai_tulis_langsung(cursor)
     
     # 1. Buat Tabel Bahan Pangan
     cursor.execute('''
@@ -151,6 +164,12 @@ def setup_database():
                             0
                         ))
                 
+                if not lokal:
+                    # Segarkan koneksi sebelum impor besar: koneksi lama
+                    # mungkin sudah menganggur selama parse CSV di atas.
+                    conn.close()
+                    conn = buat_koneksi()
+                    cursor = conn.cursor()
                 cursor.executemany('''
                 INSERT INTO bahan_pangan (nama, kalori, protein, lemak, karbohidrat, bdd, gambar, is_custom)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -230,7 +249,10 @@ def update_bahan_massal(baris: list):
     """
     conn = buat_koneksi()
     cursor = conn.cursor()
-    _mulai_tulis_langsung(cursor)
+    # BEGIN IMMEDIATE hanya lokal; di remote, executemany terkirim sebagai
+    # satu batch sehingga tetap atomik tanpa transaksi interaktif.
+    if _adalah_lokal():
+        _mulai_tulis_langsung(cursor)
     cursor.executemany(
         "UPDATE bahan_pangan SET nama = ?, kalori = ?, protein = ?, lemak = ?, karbohidrat = ?, bdd = ? WHERE id = ?",
         [(nama, kalori, protein, lemak, karbohidrat, _bdd_valid(bdd), int(id_bahan))
