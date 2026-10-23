@@ -118,19 +118,35 @@ def setup_database():
     )
     ''')
 
-    # 2b. Bersihkan duplikat baris seed (is_custom = 0) bila ada — sisakan
-    # satu baris per nama (id terkecil). Baris custom pengguna tidak disentuh.
+    # 2b/2c. Perbaikan data HANYA dijalankan bila pemeriksaan menemukan
+    # masalahnya. Pada kondisi normal (database sudah terisi dan bersih)
+    # setup hanya MEMBACA — penting untuk database remote: sesi-sesi yang
+    # mulai bersamaan tidak lagi berebut kunci tulis. Sebelumnya DELETE
+    # dan UPDATE berjalan tanpa syarat di setiap startup; di Turso sesi
+    # yang kalah menunggu sampai transaksinya di-rollback server
+    # ("stream idle") dan pengguna melihat error pada muatan pertama
+    # setelah reboot (kejadian 2026-10-24).
     cursor.execute('''
-    DELETE FROM bahan_pangan
-    WHERE is_custom = 0 AND id NOT IN (
-        SELECT MIN(id) FROM bahan_pangan WHERE is_custom = 0 GROUP BY nama
+    SELECT COUNT(*) FROM (
+        SELECT 1 FROM bahan_pangan WHERE is_custom = 0
+        GROUP BY nama HAVING COUNT(*) > 1 LIMIT 1
     )
     ''')
-
-    # 2c. Perbaiki BDD baris seed yang di luar rentang sah (0, 100] pada
-    # database lama — di CSV sumber ada makanan olahan tercatat BDD
-    # 110-400%, yang menggelembungkan hitungan gizi.
-    cursor.execute("UPDATE bahan_pangan SET bdd = 100 WHERE is_custom = 0 AND (bdd > 100 OR bdd <= 0)")
+    if cursor.fetchone()[0]:
+        # Bersihkan duplikat baris seed — sisakan satu baris per nama
+        # (id terkecil). Baris custom pengguna tidak disentuh.
+        cursor.execute('''
+        DELETE FROM bahan_pangan
+        WHERE is_custom = 0 AND id NOT IN (
+            SELECT MIN(id) FROM bahan_pangan WHERE is_custom = 0 GROUP BY nama
+        )
+        ''')
+    cursor.execute("SELECT COUNT(*) FROM bahan_pangan WHERE is_custom = 0 AND (bdd > 100 OR bdd <= 0)")
+    if cursor.fetchone()[0]:
+        # Perbaiki BDD baris seed di luar rentang sah (0, 100] pada
+        # database lama — di CSV sumber ada makanan olahan tercatat BDD
+        # 110-400%, yang menggelembungkan hitungan gizi.
+        cursor.execute("UPDATE bahan_pangan SET bdd = 100 WHERE is_custom = 0 AND (bdd > 100 OR bdd <= 0)")
     
     # Impor data jika tabel bahan_pangan masih kosong
     cursor.execute("SELECT COUNT(*) FROM bahan_pangan")
@@ -182,8 +198,24 @@ def setup_database():
     conn.close()
 
 def init_db():
-    """Inisialisasi database — cukup dipanggil sekali saat startup aplikasi."""
-    setup_database()
+    """Inisialisasi database — cukup dipanggil sekali saat startup aplikasi.
+
+    Kegagalan sementara (mis. database remote sedang sibuk sesaat)
+    dicoba ulang sampai 3 kali. Bila tetap gagal, aplikasi tetap dimuat
+    alih-alih crash total — kesalahan akan muncul pada operasi data
+    yang benar-benar membutuhkannya, dan setup berjalan lagi pada
+    muatan berikutnya.
+    """
+    import time
+    for percobaan in range(3):
+        try:
+            setup_database()
+            return
+        except Exception as e:
+            if percobaan == 2:
+                print(f"⚠️ setup_database gagal setelah 3 percobaan: {e}")
+            else:
+                time.sleep(1.5)
 
 def cari_bahan_pangan(keyword: str, limit: int = 50):
     """Mencari bahan pangan berdasarkan kata kunci nama.
