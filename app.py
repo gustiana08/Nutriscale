@@ -8,19 +8,18 @@ def tanggal_hari_ini():
     """Tanggal hari ini menurut WIB (server Streamlit berjalan di UTC,
     jadi datetime.now() polos bisa mundur sehari pada pagi hari WIB)."""
     return datetime.now(WIB).date()
-import sqlite3
 from database import (
-    init_db, 
-    simpan_menu_harian, 
-    ambil_laporan_harian, 
-    cari_bahan_pangan, 
-    tambah_bahan_custom, 
+    init_db,
+    simpan_menu_harian,
+    ambil_laporan_harian,
+    cari_bahan_pangan,
+    tambah_bahan_custom,
     update_bahan_pangan,
     update_bahan_massal,
     hapus_bahan_pangan,
     hapus_log_menu,
     ambil_log_dengan_id,
-    DB_PATH
+    ambil_bahan_editor
 )
 from calculator import konversi_berat, hitung_nutrisi_bahan, perbarui_keranjang
 from exporter import export_to_excel, export_to_csv, export_to_word
@@ -442,14 +441,7 @@ elif halaman == "Database & Kelola Bahan":
     with sub_tab1:
         search_kw = st.text_input("Cari Nama Bahan Makanan:", "", placeholder="Contoh: Ayam, Nasi, Tempe...").strip()
         
-        conn = sqlite3.connect(DB_PATH)
-        if search_kw:
-            query = "SELECT id, nama, kalori, protein, lemak, karbohidrat, bdd FROM bahan_pangan WHERE nama LIKE ?"
-            df_db = pd.read_sql_query(query, conn, params=(f"%{search_kw}%",))
-        else:
-            query = "SELECT id, nama, kalori, protein, lemak, karbohidrat, bdd FROM bahan_pangan"
-            df_db = pd.read_sql_query(query, conn)
-        conn.close()
+        df_db = ambil_bahan_editor(search_kw)
         
         st.caption(f"Menampilkan {len(df_db)} bahan pangan.")
         

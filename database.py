@@ -10,6 +10,47 @@ DB_PATH = os.path.join(_BASE_DIR, "nutriscale.db")
 CSV_PATH = os.path.join(_BASE_DIR, "nutrition.csv")
 DATASET_CSV_PATH = os.path.join(_BASE_DIR, "dataset", "nutrition.csv")
 
+# ---------------------------------------------------------------
+# Koneksi database aktif.
+# Bila kredensial Turso tersedia (Streamlit Secrets atau environment
+# TURSO_DATABASE_URL + TURSO_AUTH_TOKEN), aplikasi memakai database
+# cloud Turso (libSQL) yang PERSISTEN — data tidak hilang saat app
+# Streamlit Cloud restart/reboot. Tanpa kredensial, fallback ke
+# SQLite lokal seperti semula (untuk pengembangan lokal).
+# ---------------------------------------------------------------
+def _turso_config():
+    url = token = None
+    try:
+        import streamlit as st
+        url = st.secrets.get("TURSO_DATABASE_URL")
+        token = st.secrets.get("TURSO_AUTH_TOKEN")
+    except Exception:
+        pass
+    url = url or os.environ.get("TURSO_DATABASE_URL")
+    token = token or os.environ.get("TURSO_AUTH_TOKEN")
+    return url, token
+
+def buat_koneksi():
+    """Membuka koneksi ke database aktif (Turso bila terkonfigurasi,
+    selain itu SQLite lokal). Semua fungsi modul ini lewat sini."""
+    url, token = _turso_config()
+    if url:
+        import libsql
+        if token:
+            return libsql.connect(database=url, auth_token=token)
+        return libsql.connect(database=url)
+    return sqlite3.connect(DB_PATH, timeout=30)
+
+def _mulai_tulis_langsung(cursor):
+    """BEGIN IMMEDIATE (kunci tulis sejak awal). Pada driver yang
+    mengelola transaksi sendiri (libsql remote) perintah ini bisa
+    ditolak — abaikan: serialisasi tulis di sisi server tetap
+    menjamin tidak ada seeding/pembaruan ganda bersamaan."""
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+    except Exception:
+        pass
+
 def parse_float(val):
     """Mengonversi string bertanda koma Indonesia (misal: '435,00') menjadi float (435.0)"""
     if pd.isna(val) or val is None or str(val).strip() in ['', '-']:
@@ -22,13 +63,13 @@ def parse_float(val):
         return 0.0
 
 def setup_database():
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = buat_koneksi()
     cursor = conn.cursor()
     # Kunci tulis sejak awal (BEGIN IMMEDIATE): mencegah seeding ganda saat
     # beberapa sesi membuka aplikasi bersamaan pada database yang masih
     # kosong — tanpa kunci ini tiap sesi melihat tabel kosong dan sama-sama
     # mengimpor seluruh CSV (pernah menghasilkan 4x duplikasi baris seed).
-    cursor.execute("BEGIN IMMEDIATE")
+    _mulai_tulis_langsung(cursor)
     
     # 1. Buat Tabel Bahan Pangan
     cursor.execute('''
@@ -133,7 +174,7 @@ def cari_bahan_pangan(keyword: str, limit: int = 50):
     panggil dengan limit+1 untuk tahu apakah masih ada kecocokan lain.
     """
     kata_aman = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    conn = sqlite3.connect(DB_PATH)
+    conn = buat_koneksi()
     cursor = conn.cursor()
     query = "SELECT id, nama, kalori, protein, lemak, karbohidrat, bdd, is_custom FROM bahan_pangan WHERE nama LIKE ? ESCAPE '\\' ORDER BY nama LIMIT ?"
     cursor.execute(query, (f"%{kata_aman}%", int(limit)))
@@ -155,7 +196,7 @@ def _bdd_valid(bdd) -> float:
 
 def tambah_bahan_custom(nama: str, kalori: float, protein: float, lemak: float, karbohidrat: float, bdd: float = 100.0):
     """Menambahkan bahan pangan baru (kustom) ke database."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = buat_koneksi()
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO bahan_pangan (nama, kalori, protein, lemak, karbohidrat, bdd, is_custom) VALUES (?, ?, ?, ?, ?, ?, 1)",
@@ -167,7 +208,7 @@ def tambah_bahan_custom(nama: str, kalori: float, protein: float, lemak: float, 
 
 def update_bahan_pangan(id_bahan: int, nama: str, kalori: float, protein: float, lemak: float, karbohidrat: float, bdd: float = 100.0):
     """Memperbarui data bahan pangan berdasarkan ID."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = buat_koneksi()
     cursor = conn.cursor()
     query = """
     UPDATE bahan_pangan 
@@ -187,9 +228,9 @@ def update_bahan_massal(baris: list):
     Semua baris tersimpan, atau tidak sama sekali bila terjadi kesalahan —
     menggantikan pola lama satu koneksi + commit per baris.
     """
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = buat_koneksi()
     cursor = conn.cursor()
-    cursor.execute("BEGIN IMMEDIATE")
+    _mulai_tulis_langsung(cursor)
     cursor.executemany(
         "UPDATE bahan_pangan SET nama = ?, kalori = ?, protein = ?, lemak = ?, karbohidrat = ?, bdd = ? WHERE id = ?",
         [(nama, kalori, protein, lemak, karbohidrat, _bdd_valid(bdd), int(id_bahan))
@@ -201,7 +242,7 @@ def update_bahan_massal(baris: list):
 
 def simpan_menu_harian(tanggal, siklus_hari, waktu_makan, daftar_bahan):
     """Menyimpan log menu harian ke database."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = buat_koneksi()
     cursor = conn.cursor()
     for item in daftar_bahan:
         cursor.execute("""
@@ -219,7 +260,7 @@ def simpan_menu_harian(tanggal, siklus_hari, waktu_makan, daftar_bahan):
 
 def hapus_bahan_pangan(id_bahan: int):
     """Menghapus satu bahan pangan berdasarkan ID."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = buat_koneksi()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM bahan_pangan WHERE id = ?", (id_bahan,))
     conn.commit()
@@ -228,7 +269,7 @@ def hapus_bahan_pangan(id_bahan: int):
 
 def ambil_log_dengan_id(tanggal_awal, tanggal_akhir):
     """Mengambil log menu harian termasuk kolom id (untuk keperluan hapus entri)."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = buat_koneksi()
     query = """
         SELECT id, tanggal, siklus_hari, waktu_makan, nama_menu, bahan_pangan,
                berat_kotor, berat_bersih, bdd, energi_kcal, protein_g, lemak_g, karbo_g
@@ -242,16 +283,32 @@ def ambil_log_dengan_id(tanggal_awal, tanggal_akhir):
 
 def hapus_log_menu(log_id: int):
     """Menghapus satu entri log menu harian berdasarkan ID."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = buat_koneksi()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM log_menu_harian WHERE id = ?", (log_id,))
     conn.commit()
     conn.close()
     return True
 
+def ambil_bahan_editor(keyword: str = ""):
+    """Daftar bahan untuk editor Tab 3: semua bahan, atau yang namanya
+    mengandung keyword (LIKE). Menggantikan query sqlite3 langsung
+    yang dulu ditulis inline di app.py."""
+    conn = buat_koneksi()
+    if keyword:
+        df = pd.read_sql_query(
+            "SELECT id, nama, kalori, protein, lemak, karbohidrat, bdd FROM bahan_pangan WHERE nama LIKE ?",
+            conn, params=(f"%{keyword}%",))
+    else:
+        df = pd.read_sql_query(
+            "SELECT id, nama, kalori, protein, lemak, karbohidrat, bdd FROM bahan_pangan",
+            conn)
+    conn.close()
+    return df
+
 def ambil_laporan_harian(tanggal_awal, tanggal_akhir):
     """Mengambil data laporan harian berdasarkan rentang tanggal."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = buat_koneksi()
     query = """
         SELECT tanggal, siklus_hari, waktu_makan, nama_menu, bahan_pangan, 
                berat_kotor, berat_bersih, bdd, energi_kcal, protein_g, lemak_g, karbo_g
