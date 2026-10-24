@@ -1,10 +1,10 @@
-# GiziKu — Platform Perencanaan & Pencatatan Gizi SPPG
+# GiziKu - Platform Perencanaan & Pencatatan Gizi SPPG
 
 **GiziKu** adalah aplikasi web interaktif berbasis **Python dan Streamlit** yang dikembangkan untuk membantu proses perencanaan, perhitungan, pencatatan, dan analisis gizi pada lingkungan **Satuan Pelayanan Pemenuhan Gizi (SPPG)**.
 
 Aplikasi ini mengintegrasikan **database lebih dari 1.200 bahan pangan Indonesia** berdasarkan data **Tabel Komposisi Pangan Indonesia (TKPI)**, kalkulasi berat bahan, nilai gizi makro, pencatatan menu harian, serta visualisasi dan ekspor laporan.
 
-> 🎯 **Goal:** Digitalisasi proses perhitungan dan pencatatan gizi agar lebih terstruktur, konsisten, dan efisien.
+**Tujuan:** Digitalisasi proses perhitungan dan pencatatan gizi agar lebih terstruktur, konsisten, dan efisien.
 
 ### Tentang Repo Ini
 
@@ -12,80 +12,75 @@ Repo ini adalah salinan dari proyek terbuka [NutriScale](https://github.com/rayr
 
 ---
 
-## ✨ Key Features
+## Fitur Utama
 
-### 📝 Menu Planning & Ingredient Calculation
+### Perencanaan Menu dan Perhitungan Bahan
 
-* 🔎 **Smart Ingredient Search** — pencarian bahan pangan berdasarkan database TKPI.
-* ⚖️ **Gross & Net Weight Calculation** — perhitungan berat kotor dan berat bersih berdasarkan % BDD (Bagian yang Dapat Dimakan).
-* ✏️ **Interactive Portion Adjustment** — perubahan berat bahan secara langsung untuk menyesuaikan kebutuhan porsi.
-* 🧮 **Automatic Nutrition Calculation** — perhitungan nilai gizi berdasarkan berat bahan yang digunakan.
+* **Pencarian bahan pangan** berdasarkan database TKPI.
+* **Perhitungan berat kotor dan bersih** berdasarkan % BDD (Bagian yang Dapat Dimakan).
+* **Penyesuaian porsi interaktif** melalui tabel sajian.
+* **Perhitungan nilai gizi otomatis** berdasarkan berat bahan yang digunakan.
 
-### 📊 Nutrition Analysis & Daily Reporting
+### Analisis Gizi dan Laporan Harian
 
-* 📅 Filter laporan berdasarkan tanggal penyajian.
-* ⚡ Rekapitulasi energi harian.
-* 💪 Perhitungan protein.
-* 🥑 Perhitungan lemak.
-* 🍚 Perhitungan karbohidrat.
-* 📈 Visualisasi tren asupan energi.
-* 📤 Ekspor data ke **CSV dan Excel**.
+* Filter laporan berdasarkan tanggal penyajian.
+* Rekapitulasi energi, protein, lemak, dan karbohidrat harian.
+* Visualisasi tren asupan energi.
+* Ekspor data ke **CSV, Excel, dan Word**.
 
-### 📚 Food Database Management
+### Pengelolaan Database Bahan Pangan
 
 NutriScale menyediakan database bahan pangan yang dapat dikelola secara langsung.
 
-* 🗃️ 1.200+ data bahan pangan Indonesia.
-* ➕ Penambahan bahan pangan baru.
-* ✏️ Editing nilai gizi.
-* 📊 Pengelolaan nilai gizi per 100 gram.
-* ⚖️ Pengelolaan % BDD.
-* 💾 Penyimpanan menggunakan SQLite.
+* Lebih dari 1.200 data bahan pangan Indonesia.
+* Penambahan dan penghapusan bahan pangan.
+* Penyuntingan nilai gizi per 100 gram.
+* Pengelolaan % BDD.
+* Penyimpanan menggunakan SQLite atau Turso.
 
-### 📱 Responsive & PWA-Ready
+### Dukungan Perangkat
 
 NutriScale dirancang agar dapat digunakan pada berbagai perangkat:
 
-* 💻 Desktop / Laptop
-* 📱 Android
-* 🍎 iOS
-* 🌐 Browser modern
+* Desktop dan laptop.
+* Perangkat Android dan iOS.
+* Browser modern.
 
 ---
 
-## 🧠 Data & Calculation Workflow
+## Alur Perhitungan dan Data
 
 Secara umum, proses pengolahan data pada NutriScale mengikuti alur:
 
 ```text
 Food Database (TKPI)
-        ↓
+        ->
 Ingredient Selection
-        ↓
+        ->
 Gross Weight Input
-        ↓
+        ->
 BDD Calculation
-        ↓
+        ->
 Net Weight
-        ↓
+        ->
 Nutrition Calculation
-        ↓
+        ->
 Daily Nutrition Summary
-        ↓
+        ->
 Visualization & Reporting
 ```
 
 Konsep dasar perhitungan berat bersih:
 
 ```text
-Berat Bersih = Berat Kotor × (%BDD / 100)
+Berat Bersih = Berat Kotor x (% BDD / 100)
 ```
 
 Nilai gizi kemudian dihitung berdasarkan berat bersih bahan yang digunakan.
 
 ---
 
-## 🛠️ Technology Stack
+## Teknologi
 
 ### Programming Language
 
@@ -99,10 +94,12 @@ Nilai gizi kemudian dihitung berdasarkan berat bersih bahan yang digunakan.
 
 * Pandas
 * OpenPyXL
+* python-docx
 
 ### Database
 
 * SQLite3
+* Turso/libSQL (opsional)
 
 ### Deployment
 
@@ -110,20 +107,24 @@ Nilai gizi kemudian dihitung berdasarkan berat bersih bahan yang digunakan.
 
 ---
 
-## 📁 Project Structure
+## Struktur Proyek
 
 ```text
 nutriscale/
-│
-├── app.py              # Main Streamlit application
-├── database.py         # SQLite database initialization & management
-├── requirements.txt    # Python dependencies
-└── README.md           # Project documentation
+- app.py              # Aplikasi utama Streamlit
+- calculator.py       # Logika perhitungan berat dan gizi
+- database.py         # Inisialisasi dan pengelolaan database
+- exporter.py         # Ekspor laporan CSV, Excel, dan Word
+- style.css           # Gaya visual aplikasi
+- dataset/            # Dataset bahan pangan
+- tests/              # Automated tests
+- requirements.txt    # Dependency Python
+- README.md           # Dokumentasi proyek
 ```
 
 ---
 
-## 🚀 Run Locally
+## Menjalankan Secara Lokal
 
 ### 1. Clone Repository
 
@@ -163,7 +164,7 @@ python database.py
 ### 5. Run Application
 
 ```bash
-streamlit run app.py
+python -m streamlit run app.py
 ```
 
 The application will be available at:
@@ -172,19 +173,41 @@ The application will be available at:
 http://localhost:8501
 ```
 
+### Menjalankan Test
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+## Deployment dengan Turso
+
+Secara default aplikasi menggunakan SQLite lokal. Untuk penyimpanan persisten
+di Streamlit Community Cloud, isi dua secret berikut pada pengaturan aplikasi:
+
+```toml
+TURSO_DATABASE_URL = "libsql://nama-database.turso.io"
+TURSO_AUTH_TOKEN = "token-turso"
+```
+
+Untuk pengembangan lokal, nilai yang sama dapat diberikan sebagai environment
+variable `TURSO_DATABASE_URL` dan `TURSO_AUTH_TOKEN`. Jangan menyimpan token di
+repository.
+
 ---
 
-## 📦 Dependencies
+## Dependency
 
 ```text
 streamlit
 pandas
 openpyxl
+python-docx
+libsql
 ```
 
 ---
 
-## 🎯 Project Highlights
+## Ringkasan Implementasi
 
 | Area                  | Implementation            |
 | --------------------- | ------------------------- |
@@ -192,24 +215,24 @@ openpyxl
 | Database Management   | SQLite                    |
 | Nutrition Calculation | Python                    |
 | Data Visualization    | Streamlit                 |
-| Data Export           | CSV & Excel               |
+| Data Export           | CSV, Excel, dan Word      |
 | Web Application       | Streamlit                 |
 | Deployment            | Streamlit Community Cloud |
 | Responsive UI         | Desktop & Mobile          |
 
 ---
 
-## 👨‍💻 Developer
+## Pengembang
 
 **Moch Rayhan Aulia Rachman**
 
-Information Technology → Data Science & Machine Learning
+Information Technology -> Data Science & Machine Learning
 
 GitHub: [@rayrachman](https://github.com/rayrachman)
 
 ---
 
-## 📌 Disclaimer
+## Disclaimer
 
 NutriScale is a software project intended to support data management, calculation, and reporting workflows.
 
@@ -217,7 +240,7 @@ The application does not replace professional judgment from qualified nutritioni
 
 ---
 
-## 🔧 Catatan Perbaikan (Audit — Oktober 2026)
+## Catatan Perbaikan Audit (Oktober 2026)
 
 Perbaikan bug mayor hasil audit aplikasi live:
 
