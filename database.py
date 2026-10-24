@@ -3,6 +3,7 @@
 import pandas as pd
 import sqlite3
 import os
+import math
 
 # Path absolut relatif terhadap lokasi file ini
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -243,10 +244,35 @@ def _bdd_valid(bdd) -> float:
         bdd = float(bdd)
     except (TypeError, ValueError):
         return 100.0
+    if not math.isfinite(bdd):
+        return 100.0
     return min(max(bdd, 1.0), 100.0)
+
+def _validasi_bahan(nama, kalori, protein, lemak, karbohidrat):
+    """Memvalidasi identitas dan angka gizi sebelum disimpan."""
+    if not isinstance(nama, str) or not nama.strip():
+        raise ValueError("Nama bahan pangan wajib diisi")
+
+    nilai = []
+    for label, angka in (
+        ("kalori", kalori),
+        ("protein", protein),
+        ("lemak", lemak),
+        ("karbohidrat", karbohidrat),
+    ):
+        try:
+            angka = float(angka)
+        except (TypeError, ValueError):
+            raise ValueError(f"{label} harus berupa angka") from None
+        if not math.isfinite(angka) or angka < 0:
+            raise ValueError(f"{label} harus berupa angka nol atau lebih")
+        nilai.append(angka)
+    return nama.strip(), *nilai
 
 def tambah_bahan_custom(nama: str, kalori: float, protein: float, lemak: float, karbohidrat: float, bdd: float = 100.0):
     """Menambahkan bahan pangan baru (kustom) ke database."""
+    nama, kalori, protein, lemak, karbohidrat = _validasi_bahan(
+        nama, kalori, protein, lemak, karbohidrat)
     conn = buat_koneksi()
     cursor = conn.cursor()
     cursor.execute(
@@ -259,6 +285,8 @@ def tambah_bahan_custom(nama: str, kalori: float, protein: float, lemak: float, 
 
 def update_bahan_pangan(id_bahan: int, nama: str, kalori: float, protein: float, lemak: float, karbohidrat: float, bdd: float = 100.0):
     """Memperbarui data bahan pangan berdasarkan ID."""
+    nama, kalori, protein, lemak, karbohidrat = _validasi_bahan(
+        nama, kalori, protein, lemak, karbohidrat)
     conn = buat_koneksi()
     cursor = conn.cursor()
     query = """
@@ -279,6 +307,14 @@ def update_bahan_massal(baris: list):
     Semua baris tersimpan, atau tidak sama sekali bila terjadi kesalahan —
     menggantikan pola lama satu koneksi + commit per baris.
     """
+    baris_valid = []
+    for id_bahan, nama, kalori, protein, lemak, karbohidrat, bdd in baris:
+        nama, kalori, protein, lemak, karbohidrat = _validasi_bahan(
+            nama, kalori, protein, lemak, karbohidrat)
+        baris_valid.append((
+            int(id_bahan), nama, kalori, protein, lemak, karbohidrat, _bdd_valid(bdd)
+        ))
+
     conn = buat_koneksi()
     cursor = conn.cursor()
     # BEGIN IMMEDIATE hanya lokal; di remote, executemany terkirim sebagai
@@ -287,8 +323,8 @@ def update_bahan_massal(baris: list):
         _mulai_tulis_langsung(cursor)
     cursor.executemany(
         "UPDATE bahan_pangan SET nama = ?, kalori = ?, protein = ?, lemak = ?, karbohidrat = ?, bdd = ? WHERE id = ?",
-        [(nama, kalori, protein, lemak, karbohidrat, _bdd_valid(bdd), int(id_bahan))
-         for (id_bahan, nama, kalori, protein, lemak, karbohidrat, bdd) in baris],
+        [(nama, kalori, protein, lemak, karbohidrat, bdd, id_bahan)
+         for (id_bahan, nama, kalori, protein, lemak, karbohidrat, bdd) in baris_valid],
     )
     conn.commit()
     conn.close()
@@ -350,9 +386,10 @@ def ambil_bahan_editor(keyword: str = ""):
     yang dulu ditulis inline di app.py."""
     conn = buat_koneksi()
     if keyword:
+        kata_aman = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         df = pd.read_sql_query(
-            "SELECT id, nama, kalori, protein, lemak, karbohidrat, bdd FROM bahan_pangan WHERE nama LIKE ?",
-            conn, params=(f"%{keyword}%",))
+            "SELECT id, nama, kalori, protein, lemak, karbohidrat, bdd FROM bahan_pangan WHERE nama LIKE ? ESCAPE '\\'",
+            conn, params=(f"%{kata_aman}%",))
     else:
         df = pd.read_sql_query(
             "SELECT id, nama, kalori, protein, lemak, karbohidrat, bdd FROM bahan_pangan",

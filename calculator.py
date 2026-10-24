@@ -19,6 +19,9 @@ def konversi_berat(berat_input: float, bdd: float, tipe_input: str = "kotor"):
     if bdd <= 0:
         bdd = 100.0
         
+    if tipe_input not in ("kotor", "bersih"):
+        raise ValueError("tipe_input harus berupa 'kotor' atau 'bersih'")
+
     if tipe_input == "kotor":
         berat_kotor = berat_input
         berat_bersih = berat_input * (bdd / 100.0)

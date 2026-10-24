@@ -183,6 +183,13 @@ def export_to_excel(df_laporan: pd.DataFrame, judul: str = "Laporan Gizi SPPG") 
     judul_besar = "Laporan Gizi Harian SPPG"
     periode = _periode_teks(df_laporan)
 
+    if df_laporan.empty and len(df_laporan.columns) == 0:
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            pd.DataFrame({"Keterangan": ["Tidak ada data"]}).to_excel(
+                writer, sheet_name='Rincian Lengkap', index=False)
+        output.seek(0)
+        return output
+
     kolom_rincian = ["tanggal", "siklus_hari", "waktu_makan", "nama_menu",
                      "bahan_pangan", "berat_kotor", "berat_bersih", "bdd",
                      "energi_kcal", "protein_g", "lemak_g", "karbo_g"]
