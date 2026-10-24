@@ -129,8 +129,8 @@ nutriscale/
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/rayrachman/nutriscale.git
-cd nutriscale
+git clone https://github.com/gustiana08/Nutriscale.git
+cd Nutriscale
 ```
 
 ### 2. Create Virtual Environment
