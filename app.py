@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import hmac
 from datetime import datetime, timezone, timedelta
 
 WIB = timezone(timedelta(hours=7))
@@ -19,9 +20,20 @@ from database import (
     hapus_bahan_pangan,
     hapus_log_menu,
     ambil_log_dengan_id,
-    ambil_bahan_editor
+    ambil_bahan_editor,
+    HARI_SEKOLAH,
+    simpan_rencana_hari,
+    ambil_rencana_mingguan,
+    hapus_rencana_menu,
+    salin_rencana_hari,
 )
-from calculator import konversi_berat, hitung_nutrisi_bahan, perbarui_keranjang
+from calculator import (
+    konversi_berat,
+    hitung_nutrisi_bahan,
+    perbarui_keranjang,
+    TARGET_AKG,
+    hitung_pemenuhan_akg,
+)
 from exporter import export_to_excel, export_to_csv, export_to_word
 import altair as alt
 
@@ -29,6 +41,49 @@ import altair as alt
 init_db()
 
 st.set_page_config(page_title="GiziKu — Perencanaan & Pencatatan Gizi SPPG", page_icon="🥗", layout="wide", initial_sidebar_state="expanded")
+
+# ---------------------------------------------------------
+# GERBANG LOGIN (opsional, via Streamlit Secrets)
+# ---------------------------------------------------------
+# Bila secret GIZIKU_PASSWORD disetel, seluruh aplikasi terkunci di
+# balik satu kata sandi bersama (satu akun bersama untuk petugas
+# SPPG, bukan akun per pengguna). Bila secret tidak disetel — atau
+# secrets tidak tersedia (mis. jalan lokal tanpa secrets.toml) —
+# aplikasi tetap berjalan TERBUKA seperti semula, tanpa pesan apa
+# pun yang membocorkan ada/tidaknya kata sandi. Kata sandi tidak
+# pernah ditulis di repository; yang tersimpan di sini hanya cara
+# membacanya dari Secrets.
+def _sandi_aplikasi():
+    try:
+        sandi = st.secrets.get("GIZIKU_PASSWORD")
+    except Exception:
+        return None
+    if isinstance(sandi, str) and sandi.strip():
+        return sandi
+    return None
+
+
+def _gerbang_login():
+    sandi = _sandi_aplikasi()
+    if sandi is None:
+        return
+    if st.session_state.get("giziku_login"):
+        return
+    st.markdown("## GiziKu")
+    st.caption("Masuk dengan kata sandi petugas untuk membuka aplikasi.")
+    with st.form("form_login_giziku"):
+        masukan = st.text_input("Kata sandi", type="password")
+        tombol = st.form_submit_button("Masuk", type="primary")
+    if tombol:
+        if isinstance(masukan, str) and hmac.compare_digest(masukan, sandi):
+            st.session_state["giziku_login"] = True
+            st.rerun()
+        else:
+            st.error("Kata sandi salah. Coba lagi.")
+    st.stop()
+
+
+_gerbang_login()
 
 # =========================================================
 # TEMA VISUAL — style.css + .streamlit/config.toml
@@ -58,6 +113,27 @@ def _fmt_angka(x):
 def _fmt_tanggal_id(tgl):
     return f"{_HARI_ID[tgl.weekday()]}, {tgl.day} {_BULAN_ID[tgl.month - 1]} {tgl.year}"
 
+def _tabel_gizi_keranjang(keranjang):
+    """Menghitung berat bersih + gizi untuk tiap item keranjang (format
+    item sama dengan keranjang Input Menu Harian). Dipakai halaman
+    Perencanaan Mingguan; halaman Input memakai loop inline-nya sendiri
+    yang sudah terverifikasi dan tidak diubah."""
+    baris = []
+    for item in keranjang:
+        _, berat_bersih = konversi_berat(item["Berat Kotor (g)"], item["% BDD"], "kotor")
+        nutrisi = hitung_nutrisi_bahan(berat_bersih, item["kal_100"], item["prot_100"], item["lem_100"], item["karb_100"])
+        baris.append({
+            "Komposisi Makanan": item["Komposisi Makanan"],
+            "% BDD": item["% BDD"],
+            "Berat Kotor (g)": round(float(item["Berat Kotor (g)"]), 1),
+            "Berat Bersih (g)": round(berat_bersih, 1),
+            "Energi (kcal)": nutrisi["kalori"],
+            "Protein (g)": nutrisi["protein"],
+            "Lemak (g)": nutrisi["lemak"],
+            "Karbohidrat (g)": nutrisi["karbohidrat"],
+        })
+    return pd.DataFrame(baris)
+
 with st.sidebar:
     st.markdown("""
     <div class="side-brand">
@@ -76,7 +152,7 @@ with st.sidebar:
     st.markdown('<div class="side-label">Menu</div>', unsafe_allow_html=True)
     halaman = st.radio(
         "Navigasi halaman",
-        ["Input Menu Harian", "Laporan & Rekapitulasi Gizi", "Database & Kelola Bahan"],
+        ["Input Menu Harian", "Laporan & Rekapitulasi Gizi", "Database & Kelola Bahan", "Perencanaan Mingguan"],
         key="nav_halaman",
         label_visibility="collapsed",
     )
@@ -99,6 +175,12 @@ with st.sidebar:
         '<div class="side-note">Perencanaan menu, pencatatan sajian harian, dan pengelolaan bahan pangan untuk Satuan Pelayanan Pemenuhan Gizi (SPPG).</div>',
         unsafe_allow_html=True,
     )
+    # Tombol keluar hanya muncul bila gerbang login aktif (kata sandi
+    # disetel). Pada mode terbuka tidak ada tombol ini sama sekali.
+    if _sandi_aplikasi() is not None and st.session_state.get("giziku_login"):
+        if st.button("Keluar", key="tombol_keluar"):
+            st.session_state.pop("giziku_login", None)
+            st.rerun()
 
 # Kepala halaman utama: judul halaman aktif + tanggal hari ini (WIB).
 st.markdown(f"""
@@ -116,6 +198,37 @@ if halaman == "Input Menu Harian":
 
     if 'flash_tab1' in st.session_state:
         st.success(st.session_state.pop('flash_tab1'))
+
+    # Ringkasan hari ini — total menu tersimpan hari ini + porsi energi
+    # dari tiap makronutrien (protein x4, lemak x9, karbohidrat x4 kkal).
+    # Kartu memakai flex-wrap agar tetap terbaca di layar HP.
+    _df_hari_ini = ambil_laporan_harian(_hari_ini.strftime("%Y-%m-%d"), _hari_ini.strftime("%Y-%m-%d"))
+    if not _df_hari_ini.empty:
+        _e = float(_df_hari_ini["energi_kcal"].sum())
+        _p = float(_df_hari_ini["protein_g"].sum())
+        _l = float(_df_hari_ini["lemak_g"].sum())
+        _k = float(_df_hari_ini["karbo_g"].sum())
+        _e_prot, _e_lem, _e_karb = _p * 4, _l * 9, _k * 4
+        _e_makro = _e_prot + _e_lem + _e_karb
+        if _e_makro > 0:
+            _bagi = (f"Protein {_e_prot / _e_makro * 100:.0f}% &middot; "
+                     f"Lemak {_e_lem / _e_makro * 100:.0f}% &middot; "
+                     f"Karbohidrat {_e_karb / _e_makro * 100:.0f}% dari energi makro")
+        else:
+            _bagi = "Belum ada kandungan makro tercatat."
+        _n_menu_ini = int(_df_hari_ini["nama_menu"].nunique())
+        st.markdown(
+            f'<div class="today-sum">'
+            f'<div class="today-stat"><div class="today-stat-lab">Energi</div><div class="today-stat-val">{_fmt_angka(_e)} <span>kkal</span></div></div>'
+            f'<div class="today-stat"><div class="today-stat-lab">Protein</div><div class="today-stat-val">{_fmt_angka(_p)} <span>g</span></div></div>'
+            f'<div class="today-stat"><div class="today-stat-lab">Lemak</div><div class="today-stat-val">{_fmt_angka(_l)} <span>g</span></div></div>'
+            f'<div class="today-stat"><div class="today-stat-lab">Karbohidrat</div><div class="today-stat-val">{_fmt_angka(_k)} <span>g</span></div></div>'
+            f'</div>'
+            f'<div class="today-sum-sub">{_n_menu_ini} menu tercatat hari ini &middot; {_bagi}</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption("Belum ada menu tersimpan untuk hari ini — ringkasan muncul setelah menu pertama disimpan.")
     
     col_tgl, col_siklus, col_porsi = st.columns(3)
     with col_tgl:
@@ -346,7 +459,55 @@ elif halaman == "Laporan & Rekapitulasi Gizi":
         }).reset_index()
         
         st.dataframe(rekap_harian.round(1), width="stretch")
-        
+
+        # --- Kecukupan gizi vs AKG 2019 ---
+        st.markdown("### Kecukupan Gizi (AKG 2019)")
+        _daftar_akg = list(TARGET_AKG.keys())
+        kelompok_akg = st.selectbox(
+            "Kelompok umur AKG",
+            _daftar_akg,
+            index=_daftar_akg.index("10-12 tahun (Laki-laki)"),
+            key="pilih_akg",
+        )
+        _baris_akg = []
+        for _, _r in rekap_harian.iterrows():
+            _cek = hitung_pemenuhan_akg({
+                "energi": float(_r["energi_kcal"]),
+                "protein": float(_r["protein_g"]),
+                "lemak": float(_r["lemak_g"]),
+                "karbohidrat": float(_r["karbo_g"]),
+            }, kelompok_akg)
+            _persen = [_cek[z]["persen"] for z in ("energi", "protein", "lemak", "karbohidrat")]
+            _status = [_cek[z]["status"] for z in ("energi", "protein", "lemak", "karbohidrat")]
+            _baris_akg.append({
+                "tanggal": _r["tanggal"],
+                "energi_pct": _cek["energi"]["persen"],
+                "protein_pct": _cek["protein"]["persen"],
+                "lemak_pct": _cek["lemak"]["persen"],
+                "karbo_pct": _cek["karbohidrat"]["persen"],
+                # Penilaian hari memakai persen terendah dari keempat zat gizi.
+                "penilaian": _status[_persen.index(min(_persen))],
+            })
+        df_akg = pd.DataFrame(_baris_akg)
+        st.dataframe(
+            df_akg,
+            width="stretch",
+            column_config={
+                "tanggal": st.column_config.TextColumn("Tanggal"),
+                "energi_pct": st.column_config.NumberColumn("Energi (% AKG)", format="%.1f%%"),
+                "protein_pct": st.column_config.NumberColumn("Protein (% AKG)", format="%.1f%%"),
+                "lemak_pct": st.column_config.NumberColumn("Lemak (% AKG)", format="%.1f%%"),
+                "karbo_pct": st.column_config.NumberColumn("Karbohidrat (% AKG)", format="%.1f%%"),
+                "penilaian": st.column_config.TextColumn("Penilaian"),
+            },
+        )
+        st.caption(
+            "Target AKG 2019 (Permenkes No. 28 Tahun 2019). Penilaian: Terpenuhi bila "
+            ">= 100%, Kurang bila 80-99%, Sangat kurang bila < 80%; penilaian satu hari "
+            "memakai persen terendah dari keempat zat gizi. Lembar Kecukupan AKG ikut "
+            "terunduh pada file Excel di bawah."
+        )
+
         st.markdown("### Grafik Asupan Energi Harian (kcal)")
         # Pakai Altair eksplisit dengan sumbu Y selalu mulai dari 0.
         # st.line_chart dengan data 1 hari menghasilkan domain sumbu yang
@@ -385,7 +546,7 @@ elif halaman == "Laporan & Rekapitulasi Gizi":
             )
         
         with col_dl2:
-            excel_data = export_to_excel(df_laporan)
+            excel_data = export_to_excel(df_laporan, akg=(kelompok_akg, df_akg))
             st.download_button(
                 label="Unduh Excel",
                 data=excel_data,
@@ -528,6 +689,206 @@ elif halaman == "Database & Kelola Bahan":
                 else:
                     tambah_bahan_custom(tb_nama.strip(), tb_kal, tb_prot, tb_lemak, tb_karbo, tb_bdd)
                     st.session_state['flash_tab3'] = f"**{tb_nama.strip()}** berhasil ditambahkan ke database."
+                    st.rerun()
+
+# =========================================================
+# HALAMAN 4: PERENCANAAN MINGGUAN (Senin-Jumat)
+# =========================================================
+elif halaman == "Perencanaan Mingguan":
+    st.subheader("Perencanaan Menu Mingguan")
+
+    if 'flash_rencana' in st.session_state:
+        st.success(st.session_state.pop('flash_rencana'))
+
+    _senin_ini = tanggal_hari_ini() - timedelta(days=tanggal_hari_ini().weekday())
+    tgl_minggu = st.date_input("Minggu mulai (pilih tanggal apa pun dalam minggu itu)", _senin_ini, key="rencana_minggu")
+    senin = tgl_minggu - timedelta(days=tgl_minggu.weekday())
+    senin_str = senin.strftime("%Y-%m-%d")
+    jumat = senin + timedelta(days=4)
+    st.caption(f"Rencana minggu {_fmt_tanggal_id(senin)} s/d {_fmt_tanggal_id(jumat)}.")
+
+    # --- 1. Susun rencana satu hari dari bahan ---
+    st.markdown("### Susun Rencana Hari")
+    col_rh, col_rn = st.columns(2)
+    with col_rh:
+        hari_rencana = st.selectbox("Hari", HARI_SEKOLAH, key="rencana_hari")
+    with col_rn:
+        nama_menu_rencana = st.text_input("Nama Menu / Hidangan", placeholder="Contoh: Nasi + Ayam Kecap + Tumis Buncis", key="rencana_nama_menu")
+
+    if 'keranjang_rencana' not in st.session_state:
+        st.session_state.keranjang_rencana = []
+
+    keyword_rencana = st.text_input("Ketik Kata Kunci Bahan:", "", key="rencana_cari")
+    hasil_rencana = cari_bahan_pangan(keyword_rencana.strip(), limit=51) if keyword_rencana.strip() else []
+    if len(hasil_rencana) > 50:
+        hasil_rencana = hasil_rencana[:50]
+
+    col_rp, col_rk, col_rb = st.columns([4, 2, 1])
+    with col_rp:
+        if hasil_rencana:
+            opsi_rencana = {f"{b['nama']} (BDD: {b['bdd']}%)": b for b in hasil_rencana}
+            label_rencana = st.selectbox("Pilih Bahan:", list(opsi_rencana.keys()), key="rencana_pilih")
+            bahan_rencana = opsi_rencana[label_rencana]
+        else:
+            if keyword_rencana.strip():
+                st.warning("Tidak ada bahan makanan yang cocok dengan kata kunci tersebut.")
+            bahan_rencana = None
+    with col_rk:
+        berat_rencana = st.number_input("Berat Kotor (g):", min_value=1.0, value=100.0, step=10.0, key="rencana_kotor")
+    with col_rb:
+        st.write("")
+        st.write("")
+        if st.button("Tambah", type="primary", width="stretch", key="rencana_tambah"):
+            if bahan_rencana:
+                bdd_r = float(bahan_rencana['bdd']) if bahan_rencana['bdd'] > 0 else 100.0
+                st.session_state.keranjang_rencana.append({
+                    "Komposisi Makanan": bahan_rencana['nama'],
+                    "% BDD": bdd_r,
+                    "Berat Kotor (g)": float(berat_rencana),
+                    "kal_100": float(bahan_rencana['kalori']),
+                    "prot_100": float(bahan_rencana['protein']),
+                    "lem_100": float(bahan_rencana['lemak']),
+                    "karb_100": float(bahan_rencana['karbohidrat'])
+                })
+                st.toast(f"{bahan_rencana['nama']} ditambahkan ke rencana.")
+                st.rerun()
+            else:
+                st.error("Silakan pilih bahan makanan terlebih dahulu.")
+
+    if st.session_state.keranjang_rencana:
+        df_rencana_cart = _tabel_gizi_keranjang(st.session_state.keranjang_rencana)
+        st.dataframe(df_rencana_cart, width="stretch")
+        st.info(
+            f"**Total rencana {hari_rencana}:** Energi = **{df_rencana_cart['Energi (kcal)'].sum():.1f} kcal** | "
+            f"Protein = **{df_rencana_cart['Protein (g)'].sum():.1f} g** | "
+            f"Lemak = **{df_rencana_cart['Lemak (g)'].sum():.1f} g** | "
+            f"Karbohidrat = **{df_rencana_cart['Karbohidrat (g)'].sum():.1f} g**"
+        )
+        col_rhps, col_rsv = st.columns(2)
+        with col_rhps:
+            hapus_cart = st.multiselect("Hapus bahan dari daftar:", df_rencana_cart["Komposisi Makanan"].tolist(), key="rencana_hapus_cart")
+            if st.button("Hapus Bahan Terpilih", disabled=not hapus_cart):
+                st.session_state.keranjang_rencana = [
+                    it for it in st.session_state.keranjang_rencana
+                    if it["Komposisi Makanan"] not in hapus_cart
+                ]
+                st.rerun()
+        with col_rsv:
+            if st.button("Simpan Rencana Hari Ini", type="primary", width="stretch"):
+                if not nama_menu_rencana.strip():
+                    st.error("**Nama Menu / Hidangan** wajib diisi sebelum menyimpan rencana.")
+                else:
+                    daftar_rencana = [{
+                        "nama_menu": nama_menu_rencana.strip(),
+                        "bahan_pangan": row["Komposisi Makanan"],
+                        "berat_kotor": row["Berat Kotor (g)"],
+                        "berat_bersih": row["Berat Bersih (g)"],
+                        "bdd": row["% BDD"],
+                        "energi_kcal": row["Energi (kcal)"],
+                        "protein_g": row["Protein (g)"],
+                        "lemak_g": row["Lemak (g)"],
+                        "karbo_g": row["Karbohidrat (g)"]
+                    } for _, row in df_rencana_cart.iterrows()]
+                    simpan_rencana_hari(senin_str, hari_rencana, nama_menu_rencana.strip(), daftar_rencana)
+                    st.session_state.keranjang_rencana = []
+                    st.session_state['flash_rencana'] = f"Rencana {hari_rencana} ({nama_menu_rencana.strip()}) berhasil disimpan."
+                    st.rerun()
+    else:
+        st.caption("Belum ada bahan pada daftar rencana hari ini.")
+
+    # --- 2. Salin dari menu harian yang sudah tersimpan ---
+    st.markdown("---")
+    st.markdown("### Salin dari Menu Tersimpan")
+    st.caption("Punya menu harian yang sudah jadi? Salin susunannya ke rencana minggu ini tanpa mengetik ulang.")
+    tgl_salin = st.date_input("Tanggal menu tersimpan", tanggal_hari_ini(), key="rencana_tgl_salin")
+    df_salin = ambil_laporan_harian(tgl_salin.strftime("%Y-%m-%d"), tgl_salin.strftime("%Y-%m-%d"))
+    if df_salin.empty:
+        st.caption("Tidak ada menu tersimpan pada tanggal tersebut.")
+    else:
+        menu_tersedia = sorted(df_salin["nama_menu"].unique().tolist())
+        col_sm, col_sh, col_sb = st.columns([3, 2, 1])
+        with col_sm:
+            menu_salin = st.selectbox("Menu yang disalin:", menu_tersedia, key="rencana_menu_salin")
+        with col_sh:
+            hari_salin = st.selectbox("Ke hari:", HARI_SEKOLAH, key="rencana_hari_salin")
+        with col_sb:
+            st.write("")
+            st.write("")
+            if st.button("Salin", type="primary", width="stretch", key="rencana_tombol_salin"):
+                baris_salin = df_salin[df_salin["nama_menu"] == menu_salin].to_dict("records")
+                simpan_rencana_hari(senin_str, hari_salin, menu_salin, baris_salin)
+                st.session_state['flash_rencana'] = f"Menu {menu_salin} disalin ke rencana {hari_salin}."
+                st.rerun()
+
+    # --- 3. Rekap minggu + aksi per hari ---
+    st.markdown("---")
+    st.markdown("### Rekap Minggu Ini")
+    df_minggu = ambil_rencana_mingguan(senin_str)
+    if df_minggu.empty:
+        st.caption("Belum ada rencana pada minggu ini.")
+    else:
+        rekap_minggu = []
+        for h in HARI_SEKOLAH:
+            sub = df_minggu[df_minggu["hari"] == h]
+            if sub.empty:
+                continue
+            rekap_minggu.append({
+                "Hari": h,
+                "Menu": ", ".join(sorted(sub["nama_menu"].unique().tolist())),
+                "Energi (kcal)": round(float(sub["energi_kcal"].sum()), 1),
+                "Protein (g)": round(float(sub["protein_g"].sum()), 1),
+                "Lemak (g)": round(float(sub["lemak_g"].sum()), 1),
+                "Karbohidrat (g)": round(float(sub["karbo_g"].sum()), 1),
+            })
+        st.dataframe(pd.DataFrame(rekap_minggu), width="stretch")
+        st.info(
+            f"**Total seminggu:** Energi = **{df_minggu['energi_kcal'].sum():.1f} kcal** | "
+            f"Protein = **{df_minggu['protein_g'].sum():.1f} g** | "
+            f"Lemak = **{df_minggu['lemak_g'].sum():.1f} g** | "
+            f"Karbohidrat = **{df_minggu['karbo_g'].sum():.1f} g**"
+        )
+        with st.expander("Rincian bahan rencana minggu ini"):
+            st.dataframe(df_minggu[["hari", "nama_menu", "bahan_pangan", "berat_kotor", "berat_bersih", "energi_kcal", "protein_g", "lemak_g", "karbo_g"]], width="stretch")
+
+        st.markdown("#### Aksi Rencana")
+        col_sa, col_sb2, col_sc = st.columns(3)
+        with col_sa:
+            st.caption("Salin satu hari ke hari lain")
+            hari_asal = st.selectbox("Dari hari:", HARI_SEKOLAH, key="rencana_salin_dari")
+            hari_tujuan = st.selectbox("Ke hari:", HARI_SEKOLAH, key="rencana_salin_ke")
+            if st.button("Salin Hari", width="stretch"):
+                jumlah = salin_rencana_hari(senin_str, hari_asal, hari_tujuan)
+                st.session_state['flash_rencana'] = f"{jumlah} baris disalin dari {hari_asal} ke {hari_tujuan}."
+                st.rerun()
+        with col_sb2:
+            st.caption("Hapus menu dari rencana")
+            opsi_hapus_rencana = {
+                f"{r['hari']} — {r['nama_menu']}": (r['hari'], r['nama_menu'])
+                for _, r in df_minggu.drop_duplicates(subset=["hari", "nama_menu"]).iterrows()
+            }
+            pilihan_hapus_rencana = st.multiselect("Menu yang dihapus:", list(opsi_hapus_rencana.keys()), key="rencana_hapus_menu")
+            if st.button("Hapus Menu Terpilih", disabled=not pilihan_hapus_rencana, width="stretch"):
+                for label in pilihan_hapus_rencana:
+                    h_hapus, m_hapus = opsi_hapus_rencana[label]
+                    hapus_rencana_menu(senin_str, h_hapus, m_hapus)
+                st.session_state['flash_rencana'] = f"{len(pilihan_hapus_rencana)} menu dihapus dari rencana."
+                st.rerun()
+        with col_sc:
+            st.caption("Terapkan hari rencana ke menu harian")
+            hari_terap = st.selectbox("Hari rencana:", HARI_SEKOLAH, key="rencana_terap_hari")
+            tgl_terap = st.date_input("Tanggal penyajian:", tanggal_hari_ini(), key="rencana_terap_tgl")
+            if st.button("Terapkan ke Menu Harian", type="primary", width="stretch"):
+                sub_terap = df_minggu[df_minggu["hari"] == hari_terap]
+                if sub_terap.empty:
+                    st.error(f"Belum ada rencana untuk hari {hari_terap}.")
+                else:
+                    simpan_menu_harian(
+                        tgl_terap.strftime("%Y-%m-%d"),
+                        _HARI_ID[tgl_terap.weekday()],
+                        "Standard / Biasa",
+                        sub_terap.to_dict("records"),
+                    )
+                    st.session_state['flash_rencana'] = f"Rencana {hari_terap} diterapkan ke menu tanggal {tgl_terap.strftime('%Y-%m-%d')}."
                     st.rerun()
 
 # ---------------------------------------------------------

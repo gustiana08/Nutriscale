@@ -99,7 +99,8 @@ def _fmt_id(x):
 # =========================================================
 
 def _gaya_sheet(ws, df_tampil, kolom, judul, periode, lebar_kolom,
-                label_numerik, label_tanggal, ada_total=False):
+                label_numerik, label_tanggal, ada_total=False,
+                kolom_persen=frozenset()):
     """Tata satu sheet: judul, periode, header biru, lebar kolom, angka."""
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
@@ -138,7 +139,7 @@ def _gaya_sheet(ws, df_tampil, kolom, judul, periode, lebar_kolom,
             if i % 2 == 1:
                 cell.fill = fill_seling
             if kol in label_numerik:
-                cell.number_format = '#,##0.0'
+                cell.number_format = '#,##0.0"%"' if kol in kolom_persen else '#,##0.0'
                 cell.alignment = Alignment(horizontal="right")
             elif kol == label_tanggal:
                 cell.number_format = 'DD/MM/YYYY'
@@ -172,12 +173,19 @@ def _gaya_sheet(ws, df_tampil, kolom, judul, periode, lebar_kolom,
     return ws
 
 
-def export_to_excel(df_laporan: pd.DataFrame, judul: str = "Laporan Gizi SPPG") -> io.BytesIO:
+def export_to_excel(df_laporan: pd.DataFrame, judul: str = "Laporan Gizi SPPG",
+                    akg=None) -> io.BytesIO:
     """
     Menghasilkan file Excel (.xlsx) dari DataFrame laporan harian,
     dengan template Biru Institusi: judul + periode, header biru,
     label kolom manusiawi, lebar kolom tertata, dan baris TOTAL
     pada sheet Rekap Harian.
+
+    Args:
+        akg: opsional, tuple (label_kelompok, df_akg) dengan df_akg
+            berk kolom tanggal, energi_pct, protein_pct, lemak_pct,
+            karbo_pct, penilaian. Bila diisi, sheet ketiga
+            "Kecukupan AKG" ikut dibuat; sheet lain tidak berubah.
     """
     output = io.BytesIO()
     judul_besar = "Laporan Gizi Harian SPPG"
@@ -240,6 +248,40 @@ def export_to_excel(df_laporan: pd.DataFrame, judul: str = "Laporan Gizi SPPG") 
                             lebar_rekap,
                             {LABEL_KOLOM[k] for k in kolom_ada},
                             LABEL_KOLOM["tanggal"], ada_total=True)
+
+        # Sheet 3 (opsional): Kecukupan AKG per hari.
+        if akg is not None:
+            label_kelompok, df_akg = akg
+            if df_akg is not None and not df_akg.empty:
+                label_akg = {
+                    "tanggal": "Tanggal",
+                    "energi_pct": "Energi (% AKG)",
+                    "protein_pct": "Protein (% AKG)",
+                    "lemak_pct": "Lemak (% AKG)",
+                    "karbo_pct": "Karbohidrat (% AKG)",
+                    "penilaian": "Penilaian",
+                }
+                kolom_akg = [k for k in label_akg if k in df_akg.columns]
+                df_a = df_akg[kolom_akg].copy()
+                df_a["tanggal"] = [_parse_tanggal(v) for v in df_a["tanggal"]]
+                df_a = df_a.rename(columns=label_akg)
+                label_tampil = [label_akg[k] for k in kolom_akg]
+                df_a.to_excel(writer, sheet_name='Kecukupan AKG', index=False, startrow=3)
+                ws3 = writer.sheets['Kecukupan AKG']
+                _gaya_sheet(
+                    ws3, df_a, label_tampil,
+                    "Kecukupan Gizi (AKG 2019)",
+                    f"Kelompok umur: {label_kelompok}",
+                    {"Tanggal": 14, "Energi (% AKG)": 15, "Protein (% AKG)": 15,
+                     "Lemak (% AKG)": 15, "Karbohidrat (% AKG)": 17, "Penilaian": 15},
+                    {label_akg[k] for k in
+                     ("energi_pct", "protein_pct", "lemak_pct", "karbo_pct")
+                     if k in kolom_akg},
+                    "Tanggal",
+                    kolom_persen={label_akg[k] for k in
+                                  ("energi_pct", "protein_pct", "lemak_pct", "karbo_pct")
+                                  if k in kolom_akg},
+                )
 
     output.seek(0)
     return output

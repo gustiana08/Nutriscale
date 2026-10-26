@@ -26,7 +26,15 @@ Repo ini adalah salinan dari proyek terbuka [NutriScale](https://github.com/rayr
 * Filter laporan berdasarkan tanggal penyajian.
 * Rekapitulasi energi, protein, lemak, dan karbohidrat harian.
 * Visualisasi tren asupan energi.
+* Kecukupan gizi per hari dibanding target **AKG 2019 (Permenkes No. 28 Tahun 2019)** untuk kelompok umur 7-9, 10-12, 13-15, dan 16-18 tahun (laki-laki/perempuan), lengkap dengan persen pemenuhan dan penilaian — ikut terunduh sebagai lembar "Kecukupan AKG" pada file Excel.
 * Ekspor data ke **CSV, Excel, dan Word**.
+
+### Perencanaan Menu Mingguan
+
+* Susun menu Senin-Jumat dari bahan pangan, atau salin dari menu harian yang sudah tersimpan.
+* Rekap gizi per hari dan total seminggu.
+* Salin satu hari rencana ke hari lain, dan terapkan hari rencana langsung menjadi menu harian pada tanggal yang dipilih.
+* Rencana tersimpan di database yang sama dengan menu harian (SQLite lokal atau Turso), jadi ikut persisten.
 
 ### Pengelolaan Database Bahan Pangan
 
@@ -192,6 +200,20 @@ TURSO_AUTH_TOKEN = "token-turso"
 Untuk pengembangan lokal, nilai yang sama dapat diberikan sebagai environment
 variable `TURSO_DATABASE_URL` dan `TURSO_AUTH_TOKEN`. Jangan menyimpan token di
 repository.
+
+## Kunci Aplikasi (Opsional)
+
+Secara default aplikasi berjalan terbuka. Untuk mengunci aplikasi di balik
+satu kata sandi bersama (untuk petugas SPPG), isi secret berikut pada
+pengaturan aplikasi di Streamlit Cloud:
+
+```toml
+GIZIKU_PASSWORD = "kata-sandi-petugas"
+```
+
+Bila secret ini tidak disetel, aplikasi tetap berjalan terbuka seperti
+biasa. Jangan pernah menulis kata sandi di repository — hanya di
+Streamlit Secrets. Setelah login, tombol **Keluar** tersedia di sidebar.
 
 ---
 

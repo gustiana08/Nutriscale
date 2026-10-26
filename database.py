@@ -119,6 +119,26 @@ def setup_database():
     )
     ''')
 
+    # 2c. Buat Tabel Rencana Mingguan (Senin-Jumat). Strukturnya
+    # mengikuti log_menu_harian agar baris rencana bisa diterapkan ke
+    # menu harian apa adanya; minggu_mulai selalu hari Senin.
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS rencana_mingguan (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        minggu_mulai DATE NOT NULL,
+        hari VARCHAR(20) NOT NULL,
+        nama_menu VARCHAR(100),
+        bahan_pangan VARCHAR(100),
+        berat_kotor REAL,
+        berat_bersih REAL,
+        bdd REAL,
+        energi_kcal REAL,
+        protein_g REAL,
+        lemak_g REAL,
+        karbo_g REAL
+    )
+    ''')
+
     # 2b/2c. Perbaikan data HANYA dijalankan bila pemeriksaan menemukan
     # masalahnya. Pada kondisi normal (database sudah terisi dan bersih)
     # setup hanya MEMBACA — penting untuk database remote: sesi-sesi yang
@@ -347,6 +367,107 @@ def simpan_menu_harian(tanggal, siklus_hari, waktu_makan, daftar_bahan):
         ))
     conn.commit()
     conn.close()
+
+# ---------------------------------------------------------------
+# Rencana menu mingguan (Senin-Jumat). Satu minggu dikenali dari
+# tanggal Senin-nya (minggu_mulai). Simpan bersifat ganti-per-menu:
+# menyimpan menu yang sama pada hari yang sama menimpa susunan lama
+# menu itu, jadi menyimpan ulang hasil edit tidak menggandakan baris.
+# Semua tulis rencana memakai satu koneksi + satu commit (atomik).
+# ---------------------------------------------------------------
+HARI_SEKOLAH = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"]
+
+
+def _validasi_hari_sekolah(hari: str):
+    if hari not in HARI_SEKOLAH:
+        raise ValueError(f"Hari rencana harus salah satu dari {HARI_SEKOLAH}")
+    return hari
+
+
+def simpan_rencana_hari(minggu_mulai, hari, nama_menu, daftar_bahan):
+    """Menyimpan satu menu ke rencana hari tertentu (ganti bila menu
+    yang sama sudah ada pada hari itu). daftar_bahan memakai format
+    yang sama dengan simpan_menu_harian."""
+    _validasi_hari_sekolah(hari)
+    conn = buat_koneksi()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM rencana_mingguan WHERE minggu_mulai = ? AND hari = ? AND nama_menu = ?",
+        (minggu_mulai, hari, nama_menu),
+    )
+    for item in daftar_bahan:
+        cursor.execute("""
+            INSERT INTO rencana_mingguan
+            (minggu_mulai, hari, nama_menu, bahan_pangan, berat_kotor, berat_bersih, bdd, energi_kcal, protein_g, lemak_g, karbo_g)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            minggu_mulai, hari,
+            item['nama_menu'], item['bahan_pangan'],
+            item['berat_kotor'], item['berat_bersih'], item['bdd'],
+            item['energi_kcal'], item['protein_g'], item['lemak_g'], item['karbo_g']
+        ))
+    conn.commit()
+    conn.close()
+    return len(daftar_bahan)
+
+
+def ambil_rencana_mingguan(minggu_mulai):
+    """Seluruh baris rencana satu minggu, terurut Senin-Jumat lalu id."""
+    conn = buat_koneksi()
+    urutan = "CASE hari " + " ".join(
+        f"WHEN '{h}' THEN {i}" for i, h in enumerate(HARI_SEKOLAH)
+    ) + " ELSE 99 END"
+    df = pd.read_sql_query(
+        f"""SELECT id, minggu_mulai, hari, nama_menu, bahan_pangan,
+                   berat_kotor, berat_bersih, bdd, energi_kcal, protein_g, lemak_g, karbo_g
+            FROM rencana_mingguan
+            WHERE minggu_mulai = ?
+            ORDER BY {urutan}, id ASC""",
+        conn, params=(minggu_mulai,))
+    conn.close()
+    return df
+
+
+def hapus_rencana_menu(minggu_mulai, hari, nama_menu):
+    """Menghapus satu menu dari rencana hari tertentu."""
+    conn = buat_koneksi()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM rencana_mingguan WHERE minggu_mulai = ? AND hari = ? AND nama_menu = ?",
+        (minggu_mulai, hari, nama_menu),
+    )
+    conn.commit()
+    conn.close()
+    return True
+
+
+def salin_rencana_hari(minggu_mulai, hari_asal, hari_tujuan):
+    """Menyalin seluruh menu hari asal ke hari tujuan (menggantikan
+    isi hari tujuan). Mengembalikan jumlah baris yang disalin."""
+    _validasi_hari_sekolah(hari_asal)
+    _validasi_hari_sekolah(hari_tujuan)
+    conn = buat_koneksi()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT nama_menu, bahan_pangan, berat_kotor, berat_bersih, bdd, energi_kcal, protein_g, lemak_g, karbo_g "
+        "FROM rencana_mingguan WHERE minggu_mulai = ? AND hari = ? ORDER BY id ASC",
+        (minggu_mulai, hari_asal),
+    )
+    baris = cursor.fetchall()
+    cursor.execute(
+        "DELETE FROM rencana_mingguan WHERE minggu_mulai = ? AND hari = ?",
+        (minggu_mulai, hari_tujuan),
+    )
+    cursor.executemany(
+        """INSERT INTO rencana_mingguan
+           (minggu_mulai, hari, nama_menu, bahan_pangan, berat_kotor, berat_bersih, bdd, energi_kcal, protein_g, lemak_g, karbo_g)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        [(minggu_mulai, hari_tujuan, *r) for r in baris],
+    )
+    conn.commit()
+    conn.close()
+    return len(baris)
+
 
 def hapus_bahan_pangan(id_bahan: int):
     """Menghapus satu bahan pangan berdasarkan ID."""

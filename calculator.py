@@ -98,6 +98,70 @@ def perbarui_keranjang(keranjang_lama: list, baris_editor: list):
     return keranjang_baru, berubah
 
 
+# ---------------------------------------------------------------
+# Target AKG 2019 (Permenkes No. 28 Tahun 2019, Lampiran I Tabel 1:
+# Angka Kecukupan Energi, Protein, Lemak, Karbohidrat per orang per
+# hari). Kelompok 7-9 tahun tidak dibedakan jenis kelamin dalam
+# peraturan; kelompok 10 tahun ke atas dibedakan laki-laki/perempuan.
+# Nilai di bawah ini disalin dari teks peraturan (Berita Negara
+# Republik Indonesia Tahun 2019 Nomor 956).
+# ---------------------------------------------------------------
+TARGET_AKG = {
+    "7-9 tahun": {"energi": 1650, "protein": 40, "lemak": 55, "karbohidrat": 250},
+    "10-12 tahun (Laki-laki)": {"energi": 2000, "protein": 50, "lemak": 65, "karbohidrat": 300},
+    "10-12 tahun (Perempuan)": {"energi": 1900, "protein": 55, "lemak": 65, "karbohidrat": 280},
+    "13-15 tahun (Laki-laki)": {"energi": 2400, "protein": 70, "lemak": 80, "karbohidrat": 350},
+    "13-15 tahun (Perempuan)": {"energi": 2050, "protein": 65, "lemak": 70, "karbohidrat": 300},
+    "16-18 tahun (Laki-laki)": {"energi": 2650, "protein": 75, "lemak": 85, "karbohidrat": 400},
+    "16-18 tahun (Perempuan)": {"energi": 2100, "protein": 65, "lemak": 70, "karbohidrat": 300},
+}
+
+# Band status pemenuhan (hanya penanda tampilan, bukan standar klinis):
+# >= 100% terpenuhi, 80-99% kurang, < 80% sangat kurang.
+BAND_AKG = ((100.0, "Terpenuhi"), (80.0, "Kurang"))
+
+
+def status_pemenuhan(persen: float) -> str:
+    """Status tampilan untuk satu persen pemenuhan AKG."""
+    for batas, label in BAND_AKG:
+        if persen >= batas:
+            return label
+    return "Sangat kurang"
+
+
+def hitung_pemenuhan_akg(total: dict, kelompok_umur: str) -> dict:
+    """
+    Membandingkan total gizi sehari dengan target AKG 2019.
+
+    Args:
+        total: dict dengan kunci energi, protein, lemak, karbohidrat
+            (satuan: kkal untuk energi, gram untuk sisanya).
+        kelompok_umur: salah satu kunci TARGET_AKG.
+
+    Returns:
+        Dict per zat gizi: {"aktual", "target", "persen", "status"},
+        plus kunci "kelompok" berisi label kelompok yang dipakai.
+
+    Raises:
+        ValueError: bila kelompok_umur tidak dikenal.
+    """
+    if kelompok_umur not in TARGET_AKG:
+        raise ValueError(f"Kelompok umur AKG tidak dikenal: {kelompok_umur}")
+    target = TARGET_AKG[kelompok_umur]
+    hasil = {"kelompok": kelompok_umur}
+    for zat in ("energi", "protein", "lemak", "karbohidrat"):
+        aktual = float(total.get(zat, 0.0) or 0.0)
+        tgt = float(target[zat])
+        persen = round((aktual / tgt) * 100, 1) if tgt > 0 else 0.0
+        hasil[zat] = {
+            "aktual": round(aktual, 1),
+            "target": tgt,
+            "persen": persen,
+            "status": status_pemenuhan(persen),
+        }
+    return hasil
+
+
 def analisis_menu(daftar_bahan_terpilih: list, target_kebutuhan: dict = None):
     """
     Menganalisis keseluruhan menu dan membandingkan dengan target AKG.

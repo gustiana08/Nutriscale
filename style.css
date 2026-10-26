@@ -149,6 +149,70 @@ section[data-testid="stSidebar"] [data-testid="stRadioOption"][data-selected="tr
     color: #ffffff;
 }
 
+/* ---------- Ringkasan hari ini (atas halaman Input) ---------- */
+.today-sum {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 4px 0 8px;
+}
+.today-stat {
+    flex: 1 1 120px;
+    background-color: var(--tint);
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+.today-stat-lab {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.today-stat-val {
+    font-size: 21px;
+    font-weight: 800;
+    color: var(--navy-900);
+}
+.today-stat-val span {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--amber-dark);
+}
+.today-sum-sub {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-bottom: 18px;
+}
+
+/* ---------- Layar sempit (HP): kartu menumpuk, kepala melipat ---------- */
+@media (max-width: 768px) {
+    [data-testid="stMain"] [data-testid="stMainBlockContainer"] {
+        padding: 18px 16px 20px;
+        margin-top: 12px;
+        border-radius: 12px;
+    }
+    .page-head {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    .page-head h1 {
+        font-size: 21px;
+    }
+    .page-head span {
+        white-space: normal;
+    }
+    .today-stat {
+        flex-basis: 40%;
+    }
+    .today-stat-val {
+        font-size: 18px;
+    }
+    .side-brand-name {
+        font-size: 17px;
+    }
+}
+
 /* ---------- Kepala halaman ---------- */
 .page-head {
     display: flex;
